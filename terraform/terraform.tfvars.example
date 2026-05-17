@@ -1,0 +1,10 @@
+# Terraform variables for deployment
+# Set these via GitHub Secrets or environment variables
+
+cloudflare_api_token = ""  # Set via TF_VAR_cloudflare_api_token
+account_id           = ""  # Set via TF_VAR_account_id
+domain               = "cloudshop.example.com"
+environment          = "production"
+stripe_webhook_secret = ""  # Set via TF_VAR_stripe_webhook_secret
+printful_api_key     = ""  # Set via TF_VAR_printful_api_key
+mailchannels_api_key = ""  # Set via TF_VAR_mailchannels_api_key

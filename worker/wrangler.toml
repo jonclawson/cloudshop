@@ -1,0 +1,30 @@
+name = "cloudshop-worker"
+main = "src/index.ts"
+compatibility_date = "2024-11-07"
+
+# Cloudflare Bindings
+[[d1_databases]]
+binding = "DB"
+database_name = "cloudshop"
+database_id = "local-db"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "cloudshop-uploads"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "cloudshop-kv"
+
+# Environment-specific configurations
+[env.development]
+vars = { ENVIRONMENT = "development", USE_MOCKS = "true" }
+d1_databases = [{ binding = "DB", database_name = "cloudshop", database_id = "local-db" }]
+r2_buckets = [{ binding = "R2", bucket_name = "cloudshop-uploads" }]
+kv_namespaces = [{ binding = "KV", id = "cloudshop-kv" }]
+
+[env.production]
+vars = { ENVIRONMENT = "production", USE_MOCKS = "false" }
+d1_databases = [{ binding = "DB", database_name = "cloudshop", database_id = "prod-db" }]
+r2_buckets = [{ binding = "R2", bucket_name = "cloudshop-uploads-prod" }]
+kv_namespaces = [{ binding = "KV", id = "cloudshop-kv-prod" }]

@@ -1,0 +1,8 @@
+name = "cloudshop-pages"
+pages_build_output_dir = "dist"
+
+[env.development]
+vars = { VITE_API_BASE_URL = "http://localhost:8787", VITE_USE_MOCKS = "true" }
+
+[env.production]
+vars = { VITE_API_BASE_URL = "https://api.cloudshop.example.com", VITE_USE_MOCKS = "false" }

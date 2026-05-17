@@ -1,0 +1,62 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'tests/**'
+      - 'pages/**'
+      - 'worker/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install worker dependencies
+        working-directory: ./worker
+        run: npm install
+
+      - name: Install pages dependencies
+        working-directory: ./pages
+        run: npm install
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps
+
+      - name: Start Docker containers
+        run: docker compose up -d
+
+      - name: Wait for services to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:8787/health && curl -s http://localhost:5173 > /dev/null 2>&1; then
+              echo "Services are ready"
+              exit 0
+            fi
+            echo "Waiting for services... ($i/30)"
+            sleep 2
+          done
+          echo "Services did not start in time"
+          exit 1
+
+      - name: Run Playwright tests
+        run: npx playwright test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-report
+          path: playwright-report/
