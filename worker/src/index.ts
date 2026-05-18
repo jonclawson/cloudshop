@@ -5,8 +5,32 @@ import productsRoutes from './routes/products';
 import ordersRoutes from './routes/orders';
 import uploadsRoutes from './routes/uploads';
 import adminRoutes from './routes/admin';
+import { initializeSchema } from './db/migrations';
 
-const app = new Hono();
+type Bindings = {
+  DB: D1Database;
+  JWT_SECRET?: string;
+  ENVIRONMENT?: string;
+  USE_MOCKS?: string;
+};
+
+const app = new Hono<{ Bindings }>();
+
+// Initialize schema on first request
+let schemaInitialized = false;
+app.use('*', async (c, next) => {
+  if (!schemaInitialized) {
+    try {
+      await initializeSchema(c.env.DB);
+      schemaInitialized = true;
+    } catch (error) {
+      console.error('Schema initialization error:', error);
+      // Continue anyway - schema may already exist
+      schemaInitialized = true;
+    }
+  }
+  await next();
+});
 
 // Middleware
 app.use('*', cors());

@@ -1,68 +1,65 @@
-import { Context } from 'hono';
-import { CloudshopEnv } from '../index';
-import { ApiError } from './errorHandler';
+import { MiddlewareHandler } from 'hono';
+import { jwtVerify } from 'jose';
 
 export interface AuthPayload {
-  user_id: string;
-  email: string;
-  iat: number;
-  exp: number;
+  userId: string;
+  type: 'access' | 'refresh';
 }
 
-const JWT_SECRET = 'cloudshop-dev-secret-change-in-production';
-
-export function getJwtSecret(c: Context<CloudshopEnv>): string {
-  return c.env.JWT_SECRET || JWT_SECRET;
-}
-
-export async function authMiddleware(c: Context<CloudshopEnv>, next: any) {
+export const verifyJWT: MiddlewareHandler<{ Variables: { auth: AuthPayload } }> = async (
+  c,
+  next
+) => {
   const authHeader = c.req.header('Authorization');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new ApiError('Missing or invalid Authorization header', 401);
+    return c.json({ error: 'Missing or invalid Authorization header' }, 401);
   }
 
   const token = authHeader.slice(7);
+  const jwtSecret = (c.env as any).JWT_SECRET || 'dev-secret';
+  const secret = new TextEncoder().encode(jwtSecret);
 
   try {
-    // Basic JWT validation (you'll need to implement proper JWT verification)
-    const [header, payload, signature] = token.split('.');
-    if (!header || !payload || !signature) {
-      throw new ApiError('Invalid token format', 401);
+    const { payload } = await jwtVerify(token, secret);
+    const userId = payload.userId as string;
+    const type = payload.type as 'access' | 'refresh';
+
+    if (!userId || type !== 'access') {
+      return c.json({ error: 'Invalid token type' }, 401);
     }
 
-    const decoded = JSON.parse(atob(payload)) as AuthPayload;
-
-    // Check if token is expired
-    if (decoded.exp < Date.now() / 1000) {
-      throw new ApiError('Token expired', 401);
-    }
-
-    // Store auth info in context for route handlers
-    c.set('auth', decoded);
+    c.set('auth', { userId, type });
     await next();
-  } catch (error: any) {
-    throw new ApiError('Unauthorized', 401);
+  } catch (error) {
+    console.error('JWT verification failed:', error);
+    return c.json({ error: 'Invalid or expired token' }, 401);
   }
-}
+};
 
-export function optionalAuth(c: Context<CloudshopEnv>, next: any) {
+export const optionalAuth: MiddlewareHandler<{ Variables: { auth?: AuthPayload } }> = async (
+  c,
+  next
+) => {
   const authHeader = c.req.header('Authorization');
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
+    const jwtSecret = (c.env as any).JWT_SECRET || 'dev-secret';
+    const secret = new TextEncoder().encode(jwtSecret);
+
     try {
-      const [header, payload, signature] = token.split('.');
-      if (header && payload && signature) {
-        const decoded = JSON.parse(atob(payload)) as AuthPayload;
-        if (decoded.exp > Date.now() / 1000) {
-          c.set('auth', decoded);
-        }
+      const { payload } = await jwtVerify(token, secret);
+      const userId = payload.userId as string;
+      const type = payload.type as 'access' | 'refresh';
+
+      if (userId && type === 'access') {
+        c.set('auth', { userId, type });
       }
     } catch (e) {
       // Ignore auth errors in optional auth
     }
   }
 
-  return next();
-}
+  await next();
+};
