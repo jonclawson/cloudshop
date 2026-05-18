@@ -36,7 +36,6 @@ A minimalist, print-on-demand shopping cart application built with Cloudflare Wo
 - TailwindCSS 4.3
 - Shadcn/ui
 - use-shopping-cart (latest)
-- Axios
 
 ### Development & Deployment
 - Docker & Docker Compose
