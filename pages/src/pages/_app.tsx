@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { productsApi } from '../useApi';
+import { Link } from 'react-router-dom';
 
 export default function GlobalLayout() {
   const { isAuthenticated } = useAuth();
@@ -29,7 +30,9 @@ export default function GlobalLayout() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Cloudshop</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              <Link to="/" className="text-indigo-600 hover:text-indigo-700">Cloudshop</Link>
+            </h1>
             <nav className="flex space-x-4">
               {isAuthenticated ? (
                 <>
