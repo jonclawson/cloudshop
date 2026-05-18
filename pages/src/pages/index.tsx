@@ -24,33 +24,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Cloudshop</h1>
-            <nav className="flex space-x-4">
-              {isAuthenticated ? (
-                <>
-                  <a href="/orders" className="text-gray-700 hover:text-gray-900">
-                    Orders
-                  </a>
-                  <a href="/cart" className="text-gray-700 hover:text-gray-900">
-                    Cart
-                  </a>
-                  <a href="/login" className="text-gray-700 hover:text-gray-900">
-                    Logout
-                  </a>
-                </>
-              ) : (
-                <a href="/login" className="text-gray-700 hover:text-gray-900">
-                  Login
-                </a>
-              )}
-            </nav>
-          </div>
-        </div>
-      </header>
+      
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
