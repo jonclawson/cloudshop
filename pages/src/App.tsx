@@ -1,12 +1,8 @@
 import React from 'react';
-import { useRoutes } from 'react-router-dom';
-import routes from '~pages';
-
-
+import { Routes } from '@generouted/react-router';
 
 function App() {
-  const element = useRoutes(routes);
-  return element;
+  return <Routes />;
 }
 
 export default App;

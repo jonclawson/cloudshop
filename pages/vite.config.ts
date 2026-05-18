@@ -1,15 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import Pages from 'vite-plugin-pages';
+import Generouted from '@generouted/react-router/plugin';
 
 export default defineConfig({
   plugins: [
     react(),
-    Pages({
-      dirs: 'src/pages',
-      extensions: ['jsx', 'tsx'],
-      exclude: ['**/*.component.tsx'],
-    }),
+    Generouted(),
   ],
   server: {
     port: 5173,

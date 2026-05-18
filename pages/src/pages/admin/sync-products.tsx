@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { adminApi } from '../useApi';
+import { adminApi } from '../../useApi';
 
 export default function AdminSyncProductsPage() {
   const [loading, setLoading] = useState(false);

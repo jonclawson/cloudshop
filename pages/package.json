@@ -17,10 +17,10 @@
     "axios": "^1.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^6.0.0",
+    "react-router-dom": "^7.0.0",
     "tailwindcss": "^4.3.0",
     "use-shopping-cart": "latest",
-    "vite-plugin-pages": "^0.33.3"
+    "@generouted/react-router": "^1.19.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
