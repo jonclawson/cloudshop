@@ -1,4 +1,3 @@
-import React from 'react';
 import { Routes } from '@generouted/react-router';
 
 function App() {

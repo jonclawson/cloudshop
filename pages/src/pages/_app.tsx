@@ -1,28 +1,9 @@
 import { Outlet } from 'react-router-dom';
-import React, { useEffect, useState } from 'react';
 import { useAuth } from '../AuthContext';
-import { productsApi } from '../useApi';
 import { Link } from 'react-router-dom';
 
 export default function GlobalLayout() {
   const { isAuthenticated } = useAuth();
-  const [products, setProducts] = useState<unknown[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await productsApi.getAll();
-        setProducts(response.data.products || []);
-      } catch (error) {
-        console.error('Failed to fetch products:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, []);
 
   return (
     <div className="min-h-screen bg-white">

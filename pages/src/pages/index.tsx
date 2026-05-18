@@ -1,17 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { useAuth } from '../AuthContext';
+import { useEffect, useState } from 'react';
 import { productsApi } from '../useApi';
 
+type Product = {
+  id: string;
+  title?: string;
+  description?: string;
+  variants?: Array<{ price?: number }>;
+};
+
 export default function HomePage() {
-  const { isAuthenticated } = useAuth();
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await productsApi.getAll();
-        setProducts(response.data.products || []);
+        setProducts((response.data.products || []) as Product[]);
       } catch (error) {
         console.error('Failed to fetch products:', error);
       } finally {
@@ -36,7 +41,7 @@ export default function HomePage() {
           <p>No products available</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map((product: any) => (
+            {products.map((product: Product) => (
               <a
                 key={product.id}
                 href={`/product/${product.id}`}
