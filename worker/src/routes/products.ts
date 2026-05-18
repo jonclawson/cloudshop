@@ -18,13 +18,13 @@ products.get('/', async (c) => {
 
 products.get('/:id', async (c) => {
   const id = c.req.param('id');
-  return c.json({
-    id,
-    name: 'Product Name',
-    description: 'Product description',
-    base_price: 19.99,
-    variants: [],
-  });
+  const result = await mockPrintful.syncProducts();
+  const product = result.products.find((p) => +p.id === +id);
+  if (!product) {
+    return c.json({ error: 'Product not found' }, 404);
+  }
+  
+  return c.json(product); 
 });
 
 export default products;
