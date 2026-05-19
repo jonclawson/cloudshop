@@ -75,3 +75,6 @@ Thumbs.db
 
 
 .sixth
+
+test-results
+playwright-report/

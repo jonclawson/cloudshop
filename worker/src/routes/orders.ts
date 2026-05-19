@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 import { getDb, schema } from '../db';
 import { verifyJWT } from '../middleware/auth';
 
@@ -33,7 +33,7 @@ function toMoneyDollarsFromCents(cents: number): number {
 }
 
 orders.post('/', verifyJWT, async (c) => {
-  const auth = c.get('auth');
+  const auth = c.get('auth') as { userId: string };
   const { userId } = auth;
 
   const body = (await c.req.json()) as CreateOrderBody;
@@ -43,16 +43,23 @@ orders.post('/', verifyJWT, async (c) => {
     return c.json({ error: 'Order items required' }, 400);
   }
 
-  const orderId = crypto.randomUUID();
+  // ---- Ensure referenced FK rows exist to avoid FOREIGN KEY constraint failures ----
+  // order_items.product_variant_id -> product_variants.id -> product_id -> products.id
+  const variantIds = new Set<string>();
+  const productIds = new Set<string>();
+  const productIdByVariantId = new Map<string, string>();
+  const productBasePriceDollarsByProductId = new Map<string, number>();
 
-  // Map cart items -> order item rows
-  const orderItemRows = cartItems.map((item) => {
+  for (const item of cartItems) {
+    if (!item.variantId) throw new Error('Missing variantId on order item');
+    if (!item.productId) throw new Error('Missing productId on order item');
+
+    const variantId = String(item.variantId);
+    const productId = String(item.productId);
+
     const quantity = Number(item.quantity ?? 0);
     const priceCents = Number(item.price ?? 0);
 
-    if (!item.variantId) {
-      throw new Error('Missing variantId on order item');
-    }
     if (!Number.isFinite(quantity) || quantity <= 0) {
       throw new Error('Invalid quantity on order item');
     }
@@ -60,10 +67,85 @@ orders.post('/', verifyJWT, async (c) => {
       throw new Error('Invalid price on order item');
     }
 
+    variantIds.add(variantId);
+    productIds.add(productId);
+    productIdByVariantId.set(variantId, productId);
+
+    if (!productBasePriceDollarsByProductId.has(productId)) {
+      productBasePriceDollarsByProductId.set(productId, toMoneyDollarsFromCents(priceCents));
+    }
+  }
+
+  const db = getDb(c.env.DB);
+  const variantIdList = [...variantIds];
+  const productIdList = [...productIds];
+
+  // Insert missing products
+  if (productIdList.length > 0) {
+    const existingProducts = await db
+      .select({ id: schema.products.id })
+      .from(schema.products)
+      .where(inArray(schema.products.id, productIdList));
+
+    const existingProductIdSet = new Set(existingProducts.map((r) => r.id));
+    const missingProductIds = productIdList.filter((id) => !existingProductIdSet.has(id));
+
+    if (missingProductIds.length > 0) {
+      await db.insert(schema.products).values(
+        missingProductIds.map((productId) => ({
+          id: productId,
+          sku: `synthetic-${productId}`,
+          name: `Synthetic product ${productId}`,
+          description: null,
+          base_price: productBasePriceDollarsByProductId.get(productId) ?? 0,
+          printful_product_id: null,
+          printful_sync_at: null,
+        }))
+      );
+    }
+  }
+
+  // Insert missing product variants
+  if (variantIdList.length > 0) {
+    const existingVariants = await db
+      .select({ id: schema.productVariants.id })
+      .from(schema.productVariants)
+      .where(inArray(schema.productVariants.id, variantIdList));
+
+    const existingVariantIdSet = new Set(existingVariants.map((r) => r.id));
+    const missingVariantIds = variantIdList.filter((id) => !existingVariantIdSet.has(id));
+
+    if (missingVariantIds.length > 0) {
+      await db.insert(schema.productVariants).values(
+        missingVariantIds.map((variantId) => ({
+          id: variantId,
+          product_id: productIdByVariantId.get(variantId)!,
+          size: null,
+          color: null,
+          price_override: null,
+          printful_variant_id: null,
+        }))
+      );
+    }
+  }
+
+  // ---- Create order + items ----
+  const orderId = crypto.randomUUID();
+
+  const orderItemRows = cartItems.map((item) => {
+    const quantity = Number(item.quantity ?? 0);
+    const priceCents = Number(item.price ?? 0);
+
+    const variantId = item.variantId ? String(item.variantId) : undefined;
+    const productId = item.productId ? String(item.productId) : undefined;
+
+    if (!variantId) throw new Error('Missing variantId on order item');
+    if (!productId) throw new Error('Missing productId on order item');
+
     return {
       id: crypto.randomUUID(),
       order_id: orderId,
-      product_variant_id: String(item.variantId),
+      product_variant_id: variantId,
       quantity,
       price_at_purchase: toMoneyDollarsFromCents(priceCents),
       user_upload_id: null as string | null,
@@ -74,8 +156,6 @@ orders.post('/', verifyJWT, async (c) => {
     (sum, row) => sum + row.price_at_purchase * row.quantity,
     0
   );
-
-  const db = getDb(c.env.DB);
 
   try {
     await db.insert(schema.orders).values({
