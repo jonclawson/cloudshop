@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useShoppingCart } from 'use-shopping-cart';
 import { useParams } from 'react-router-dom';
 import { productsApi } from '../../useApi';
-
+import { useNavigate } from 'react-router-dom';
 type ProductVariant = {
   id: number | string;
   external_id?: string;
@@ -22,6 +22,7 @@ type Product = {
 };
 
 export default function ProductPage() {
+  const router = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { addItem } = useShoppingCart();
   const [product, setProduct] = useState<Product | null>(null);
@@ -75,6 +76,7 @@ export default function ProductPage() {
       variantId: String(selectedVariant.id),
       productId: String(product.external_id ?? product.id),
     });
+    router('/cart');
   };
 
   if (loading) {
