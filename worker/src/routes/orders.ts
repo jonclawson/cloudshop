@@ -371,8 +371,22 @@ orders.get('/:id', verifyJWT, async (c) => {
     }
 
     const itemRows = await db
-      .select()
+      .select({
+        order_item_id: schema.orderItems.id,
+        product_variant_id: schema.orderItems.product_variant_id,
+        quantity: schema.orderItems.quantity,
+        price_at_purchase: schema.orderItems.price_at_purchase,
+        product_name: schema.products.name,
+        product_sku: schema.products.sku,
+        size: schema.productVariants.size,
+        color: schema.productVariants.color,
+      })
       .from(schema.orderItems)
+      .innerJoin(
+        schema.productVariants,
+        eq(schema.orderItems.product_variant_id, schema.productVariants.id)
+      )
+      .innerJoin(schema.products, eq(schema.productVariants.product_id, schema.products.id))
       .where(eq(schema.orderItems.order_id, id));
 
     return c.json({
@@ -382,9 +396,14 @@ orders.get('/:id', verifyJWT, async (c) => {
       total_price: order.total_price,
       created_at: order.created_at,
       items: itemRows.map((row) => ({
+        order_item_id: row.order_item_id,
         product_variant_id: row.product_variant_id,
         quantity: row.quantity,
         price_at_purchase: row.price_at_purchase,
+        product_name: row.product_name,
+        product_sku: row.product_sku,
+        size: row.size,
+        color: row.color,
       })),
     });
   } catch (error) {

@@ -4,7 +4,12 @@ import { ordersApi } from '../../useApi';
 import { useNavigate, useParams } from 'react-router-dom';
 
 type OrderItem = {
+  order_item_id: string;
   product_variant_id: string;
+  product_name?: string;
+  product_sku?: string;
+  size?: string | null;
+  color?: string | null;
   quantity: number;
   price_at_purchase: number;
 };
@@ -123,16 +128,50 @@ export default function OrderDetailsPage() {
 
             <div className="pt-4 border-t border-gray-200">
               <p className="font-semibold mb-3">Items</p>
+
               {order.items && order.items.length > 0 ? (
-                <div className="space-y-2">
-                  {order.items.map((item) => (
-                    <div key={item.product_variant_id} className="flex justify-between gap-4">
-                      <span className="text-sm text-gray-700">Variant {item.product_variant_id}</span>
-                      <span className="text-sm text-gray-600">
-                        Qty {item.quantity} • {formatMoney(item.price_at_purchase)}
-                      </span>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  {order.items.map((item) => {
+                    const lineTotal = item.price_at_purchase * item.quantity;
+
+                    return (
+                      <div
+                        key={item.order_item_id || item.product_variant_id}
+                        className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 rounded-lg border border-gray-200 p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {item.product_name || `Product ${item.product_variant_id}`}
+                          </p>
+
+                          <p className="text-xs text-gray-600 truncate">
+                            SKU {item.product_sku || '—'}
+                          </p>
+
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700">
+                              Size: {item.size || '—'}
+                            </span>
+                            <span className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700">
+                              Color: {item.color || '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-sm text-gray-700 sm:text-right">
+                          <p className="font-medium">
+                            Qty {item.quantity}
+                          </p>
+                          <p className="text-gray-600">
+                            {formatMoney(item.price_at_purchase)} each
+                          </p>
+                          <p className="font-semibold text-gray-900">
+                            Line total: {formatMoney(lineTotal)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-sm text-gray-600">No items found for this order.</p>

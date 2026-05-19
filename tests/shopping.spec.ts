@@ -10,7 +10,10 @@ test.describe('Shopping', () => {
     await expect(page.getByRole('heading', { name: 'Our Products' })).toBeVisible({ timeout: 5000 });
 
     const productLinks = page.locator('a[href^="/product/"]');
-    await page.waitForTimeout(250); // allow productsApi to settle in client-only cart mode
+
+    // Avoid arbitrary sleeps: wait until at least one product link actually renders.
+    await expect(productLinks.first()).toBeVisible({ timeout: 5000 });
+
     const count = await productLinks.count();
     expect(count).toBeGreaterThan(0);
   });
@@ -19,6 +22,8 @@ test.describe('Shopping', () => {
     await page.goto(`${BASE_URL}/`);
 
     const productLinks = page.locator('a[href^="/product/"]');
+    await expect(productLinks.first()).toBeVisible({ timeout: 5000 });
+
     const count = await productLinks.count();
     expect(count).toBeGreaterThan(0);
 
@@ -30,6 +35,8 @@ test.describe('Shopping', () => {
     // Ensure a product exists.
     await page.goto(`${BASE_URL}/`);
     const productLinks = page.locator('a[href^="/product/"]');
+    await expect(productLinks.first()).toBeVisible({ timeout: 5000 });
+
     const count = await productLinks.count();
     expect(count).toBeGreaterThan(0);
 
