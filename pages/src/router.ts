@@ -9,10 +9,12 @@ export type Path =
   | `/cart`
   | `/checkout`
   | `/login`
+  | `/order/:id`
   | `/orders`
   | `/product/:id`
 
 export type Params = {
+  '/order/:id': { id: string }
   '/product/:id': { id: string }
 }
 

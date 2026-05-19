@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { ordersApi } from '../useApi';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 type OrderItem = {
   product_variant_id: string;
@@ -21,12 +21,30 @@ type OrderDetail = {
 
 export default function OrdersPage() {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
   const [orders, setOrders] = useState<OrderDetail[]>([]);
   const [orderDetail, setOrderDetail] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [searchParams] = useSearchParams();
   const confirmation = useMemo(() => searchParams.get('confirmation'), [searchParams]);
+
+  const moneyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    []
+  );
+
+  const formatMoney = (value: number | undefined) => {
+    if (value === undefined || value === null || !Number.isFinite(value)) return '—';
+    return moneyFormatter.format(value);
+  };
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -86,8 +104,8 @@ export default function OrdersPage() {
                   <p className="text-sm text-gray-600">{orderDetail.created_at}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold">${orderDetail.total_price}</p>
-                  <p className="text-sm text-gray-600">{orderDetail.status}</p>
+                  <p className="font-semibold text-lg">{formatMoney(orderDetail.total_price)}</p>
+                  <p className="text-sm text-gray-600">{orderDetail.status ?? '—'}</p>
                 </div>
               </div>
 
@@ -99,7 +117,7 @@ export default function OrdersPage() {
                       <div key={item.product_variant_id} className="flex justify-between gap-4">
                         <span className="text-sm text-gray-700">Variant {item.product_variant_id}</span>
                         <span className="text-sm text-gray-600">
-                          Qty {item.quantity} • ${item.price_at_purchase}
+                          Qty {item.quantity} • {formatMoney(item.price_at_purchase)}
                         </span>
                       </div>
                     ))}
@@ -136,20 +154,33 @@ export default function OrdersPage() {
         ) : (
           <div className="space-y-4">
             {orders.map((order) => {
-              const id = order.id || order.order_id;
+              const id = order.id;
+              const orderStatus = order.status ?? '—';
+              const createdAt = order.created_at ?? '';
+              const totalPrice = formatMoney(order.total_price);
+
               return (
-                <div key={id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-semibold">Order #{id}</p>
-                      <p className="text-sm text-gray-600">{order.created_at}</p>
+                <button
+                  key={id ?? order.order_id ?? `${order.created_at ?? 'order'}-${Math.random()}`}
+                  type="button"
+                  disabled={!id}
+                  onClick={() => {
+                    if (!id) return;
+                    navigate(`/order/${id}`);
+                  }}
+                  className="w-full border border-gray-200 rounded-lg p-4 text-left hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <div className="flex justify-between items-center gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">Order #{id ?? '—'}</p>
+                      <p className="text-sm text-gray-600">{createdAt}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">${order.total_price}</p>
-                      <p className="text-sm text-gray-600">{order.status}</p>
+                      <p className="font-semibold">{totalPrice}</p>
+                      <p className="text-sm text-gray-600">{orderStatus}</p>
                     </div>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
