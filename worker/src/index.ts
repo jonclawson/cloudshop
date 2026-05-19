@@ -7,12 +7,14 @@ import uploadsRoutes from './routes/uploads';
 import adminRoutes from './routes/admin';
 import { initializeSchema } from './db/migrations';
 
-type Bindings = {
+export type CloudshopEnv = {
   DB: D1Database;
   JWT_SECRET?: string;
   ENVIRONMENT?: string;
   USE_MOCKS?: string;
 };
+
+type Bindings = CloudshopEnv;
 
 const app = new Hono<{ Bindings }>();
 

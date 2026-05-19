@@ -1,7 +1,6 @@
 import { Context } from 'hono';
-import { CloudshopEnv } from '../index';
 
-export async function errorHandler(c: Context<CloudshopEnv>, next: any) {
+export async function errorHandler(c: Context, next: any) {
   try {
     await next();
   } catch (error: any) {

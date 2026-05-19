@@ -1,7 +1,9 @@
 import { useAuth } from '../AuthContext';
 import { useShoppingCart } from 'use-shopping-cart';
+import { useNavigate } from 'react-router-dom';
 
 export default function CartPage() {
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const {
     cartDetails,
@@ -38,13 +40,13 @@ export default function CartPage() {
           </div>
 
           {items.length > 0 && (
-            <button
-              type="button"
-              onClick={clearCart}
-              className="self-start sm:self-auto text-sm font-medium text-red-600 hover:text-red-700"
-            >
-              Clear cart
-            </button>
+              <button
+                type="button"
+                onClick={() => clearCart()}
+                className="self-start sm:self-auto text-sm font-medium text-red-600 hover:text-red-700"
+              >
+                Clear cart
+              </button>
           )}
         </div>
 
@@ -111,7 +113,8 @@ export default function CartPage() {
 
               <button
                 type="button"
-                className="mt-6 w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition"
+                onClick={() => navigate('/checkout')}
+                className="mt-6 w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition disabled:opacity-50"
               >
                 Proceed to Checkout
               </button>
