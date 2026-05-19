@@ -32,7 +32,6 @@ export default function HomePage() {
       
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-8">Our Products</h2>
 
         {loading ? (
@@ -58,7 +57,6 @@ export default function HomePage() {
             ))}
           </div>
         )}
-      </main>
     </div>
   );
 }

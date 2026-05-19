@@ -17,7 +17,6 @@ export default function CartPage() {
 
   return (
     <div className="main-class">
-      <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">Shopping Cart</h1>
@@ -106,7 +105,6 @@ export default function CartPage() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

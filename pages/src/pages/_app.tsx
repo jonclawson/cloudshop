@@ -6,7 +6,7 @@ export default function GlobalLayout() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <div className="">
+    <>
       {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
@@ -48,6 +48,6 @@ export default function GlobalLayout() {
           &copy; {new Date().getFullYear()} My Store Inc. All rights reserved.
         </div>
       </footer>
-    </div>
+    </>
   );
 }

@@ -82,7 +82,6 @@ export default function OrderDetailsPage() {
 
   return (
     <div className="main-class">
-      <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-bold">Order Details</h1>
           <button
@@ -152,7 +151,6 @@ export default function OrderDetailsPage() {
             </button>
           </div>
         )}
-      </div>
     </div>
   );
 }
