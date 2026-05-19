@@ -23,7 +23,7 @@
 //     }, []);
 
 //   return (
-//     <div className="min-h-screen bg-white">
+//     <div className="main-class">
       
 //      {/* Header */}
 //       <header className="bg-white shadow">

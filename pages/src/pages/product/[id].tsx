@@ -88,7 +88,7 @@ export default function ProductPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="main-class">
       <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
@@ -127,7 +127,7 @@ export default function ProductPage() {
               type="button"
               onClick={handleAddToCart}
               disabled={!selectedVariant}
-              className="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add to Cart
             </button>

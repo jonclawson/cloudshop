@@ -6,7 +6,7 @@ export default function GlobalLayout() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="">
       {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
@@ -38,7 +38,7 @@ export default function GlobalLayout() {
       </header>
 
       {/* Active route content */}
-      <main className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+      <main className="min-h-screen max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         <Outlet />
       </main>
 

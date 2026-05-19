@@ -69,7 +69,7 @@ export default function OrderDetailsPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="main-class flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Please sign in to view orders</h2>
           <a href="/login" className="text-indigo-600 hover:text-indigo-700">
@@ -81,7 +81,7 @@ export default function OrderDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="main-class">
       <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-bold">Order Details</h1>
