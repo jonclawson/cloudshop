@@ -1,13 +1,20 @@
 import { Hono } from 'hono';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { getDb, schema } from '../db';
-import { verifyJWT } from '../middleware/auth';
+import { verifyJWT, optionalAuth } from '../middleware/auth';
+import {
+  generateJWT,
+  generateRandomPassword,
+  generateRefreshToken,
+  hashPassword,
+} from '../services/authUtils';
 
 type Bindings = {
   DB: D1Database;
   ENVIRONMENT?: string;
   USE_MOCKS?: string;
   JWT_SECRET?: string;
+  KV: KVNamespace;
 };
 
 const orders = new Hono<{ Bindings }>();
@@ -25,6 +32,7 @@ type OrderRequestItem = {
 type CreateOrderBody = {
   items?: OrderRequestItem[];
   shipping_address?: unknown;
+  email?: string;
 };
 
 function toMoneyDollarsFromCents(cents: number): number {
@@ -32,15 +40,116 @@ function toMoneyDollarsFromCents(cents: number): number {
   return cents / 100;
 }
 
-orders.post('/', verifyJWT, async (c) => {
-  const auth = c.get('auth') as { userId: string };
-  const { userId } = auth;
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function isValidEmail(email: string): boolean {
+  // Pragmatic email validation for UX; backend must not trust it.
+  // This is intentionally simple (no over-strict RFC validation).
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+async function rateLimitCreateOrder(c: { env: Bindings }, key: string): Promise<void> {
+  const limit = 5; // requests
+  const windowMs = 60 * 60 * 1000; // 1 hour
+
+  const now = Date.now();
+  const windowId = Math.floor(now / windowMs);
+  const kvKey = `rate:orders:create:${windowId}:${key}`;
+
+  const existing = await c.env.KV.get(kvKey);
+  const current = existing ? Number(existing) : 0;
+
+  if (Number.isFinite(current) && current >= limit) {
+    // Match shape used across routes
+    throw new Error('RATE_LIMIT_EXCEEDED');
+  }
+
+  const next = (Number.isFinite(current) ? current : 0) + 1;
+  await c.env.KV.put(kvKey, String(next), { expirationTtl: 60 * 60 });
+}
+
+async function upsertUserByEmail(c: { env: Bindings; req: any }, email: string): Promise<string> {
+  const normalized = normalizeEmail(email);
+  if (!isValidEmail(normalized)) {
+    return Promise.reject(new Error('INVALID_EMAIL'));
+  }
+
+  const db = getDb(c.env.DB);
+
+  const existing = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.email, normalized))
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0].id as string;
+  }
+
+  // Create user with a server-generated random password.
+  const userId = crypto.randomUUID();
+  const randomPassword = generateRandomPassword(24);
+  const passwordHash = await hashPassword(randomPassword);
+
+  await db.insert(schema.users).values({
+    id: userId,
+    email: normalized,
+    password_hash: passwordHash,
+  });
+
+  return userId;
+}
+
+orders.post('/', optionalAuth, async (c) => {
+  const auth = c.get('auth') as { userId: string } | undefined;
+  const authUserId = auth?.userId;
 
   const body = (await c.req.json()) as CreateOrderBody;
   const cartItems = body.items;
 
   if (!cartItems || cartItems.length === 0) {
     return c.json({ error: 'Order items required' }, 400);
+  }
+
+  // ---- Rate limiting (anonymous checkout path) ----
+  // For authenticated users, keep the behavior unchanged (no extra limiting).
+  if (!authUserId) {
+    const emailForKey = typeof body.email === 'string' && body.email ? normalizeEmail(body.email) : 'missing-email';
+    const ip =
+      c.req.header('CF-Connecting-IP') ||
+      c.req.header('X-Forwarded-For') ||
+      c.req.header('x-forwarded-for') ||
+      'unknown-ip';
+    const key = `${emailForKey}:${ip}`;
+    try {
+      await rateLimitCreateOrder(c as { env: Bindings }, key);
+    } catch (err) {
+      if (err instanceof Error && err.message === 'RATE_LIMIT_EXCEEDED') {
+        return c.json({ error: 'Too many requests' }, 429);
+      }
+      throw err;
+    }
+  }
+
+  // If anonymous, resolve/create by email.
+  let userId = authUserId;
+  if (!userId) {
+    const email = body.email;
+    if (typeof email !== 'string' || !email) {
+      return c.json({ error: 'Email required for checkout' }, 400);
+    }
+
+    try {
+      userId = await upsertUserByEmail(c as { env: Bindings; req: any }, email);
+    } catch (err) {
+      if (err instanceof Error && err.message === 'INVALID_EMAIL') {
+        return c.json({ error: 'Invalid email' }, 400);
+      }
+      console.error('Upsert user failed:', err);
+      return c.json({ error: 'Checkout failed' }, 500);
+    }
   }
 
   // ---- Ensure referenced FK rows exist to avoid FOREIGN KEY constraint failures ----
@@ -157,6 +266,8 @@ orders.post('/', verifyJWT, async (c) => {
     0
   );
 
+  const jwtSecret = c.env.JWT_SECRET || 'dev-secret';
+
   try {
     await db.insert(schema.orders).values({
       id: orderId,
@@ -169,7 +280,29 @@ orders.post('/', verifyJWT, async (c) => {
 
     await db.insert(schema.orderItems).values(orderItemRows);
 
-    // Keep Stripe as a stub for now (not testable until Stripe account/keys exist)
+    // Return tokens for both anonymous + authenticated flow so frontend can load order confirmation.
+    const accessToken = await generateJWT(userId, jwtSecret);
+    const refreshToken = await generateRefreshToken(userId, jwtSecret);
+    const refreshTokenHash = await hashPassword(refreshToken);
+
+    const expiresAt = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
+
+    await db.insert(schema.refreshTokens).values({
+      id: crypto.randomUUID(),
+      user_id: userId,
+      token_hash: refreshTokenHash,
+      expires_at: expiresAt,
+    });
+
+    // Get email for response (handy for frontend AuthContext)
+    const userRow = await db
+      .select({ email: schema.users.email })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    const userEmail = userRow[0]?.email;
+
     return c.json(
       {
         order_id: orderId,
@@ -178,6 +311,10 @@ orders.post('/', verifyJWT, async (c) => {
         status: 'pending',
         items: cartItems,
         payment_intent: { client_secret: 'pi_stub_client_secret' },
+
+        user: userEmail ? { id: userId, email: userEmail } : { id: userId, email: null },
+        access_token: accessToken,
+        refresh_token: refreshToken,
       },
       201
     );
@@ -188,7 +325,7 @@ orders.post('/', verifyJWT, async (c) => {
 });
 
 orders.get('/', verifyJWT, async (c) => {
-  const auth = c.get('auth');
+  const auth = c.get('auth') as { userId: string };
   const { userId } = auth;
 
   const db = getDb(c.env.DB);
@@ -209,7 +346,7 @@ orders.get('/', verifyJWT, async (c) => {
 });
 
 orders.get('/:id', verifyJWT, async (c) => {
-  const auth = c.get('auth');
+  const auth = c.get('auth') as { userId: string };
   const { userId } = auth;
 
   const id = c.req.param('id');

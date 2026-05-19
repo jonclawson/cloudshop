@@ -1,10 +1,8 @@
-import { useAuth } from '../AuthContext';
 import { useShoppingCart } from 'use-shopping-cart';
 import { useNavigate } from 'react-router-dom';
 
 export default function CartPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
   const {
     cartDetails,
     cartCount,
@@ -16,19 +14,6 @@ export default function CartPage() {
   } = useShoppingCart();
 
   const items = Object.values(cartDetails ?? {});
-
-  if (!isAuthenticated) {
-    return (
-      <div className="main-class flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Please sign in to continue</h2>
-          <a href="/login" className="text-indigo-600 hover:text-indigo-700">
-            Go to login
-          </a>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="main-class">

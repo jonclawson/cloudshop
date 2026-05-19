@@ -263,11 +263,11 @@ export const productsApi = {
 };
 
 export const ordersApi = {
-  create: (items: unknown[], shippingAddress: unknown) =>
+  create: (items: unknown[], shippingAddress: unknown, email: string) =>
     sendRequest<unknown>(`/api/orders`, {
       method: 'POST',
-      auth: true,
-      body: { items, shipping_address: shippingAddress },
+      auth: false,
+      body: { items, shipping_address: shippingAddress, email },
     }),
 
   getAll: () =>

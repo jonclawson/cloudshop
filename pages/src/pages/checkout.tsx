@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { ordersApi } from '../useApi';
@@ -31,17 +31,29 @@ function StripePaymentStub() {
   );
 }
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+const ACCESS_TOKEN_KEY = 'access_token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
+const USER_KEY = 'user';
+
 export default function CheckoutPage() {
-  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const {
-    cartDetails,
-    formattedTotalPrice,
-    clearCart,
-  } = useShoppingCart();
+  const { user, setUser } = useAuth();
+
+  const { cartDetails, formattedTotalPrice, clearCart } = useShoppingCart();
 
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string>('');
+  const [email, setEmail] = useState<string>(user?.email ?? '');
+
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user?.email]);
 
   const items = useMemo(() => Object.values(cartDetails ?? {}), [cartDetails]);
 
@@ -57,18 +69,7 @@ export default function CheckoutPage() {
     })) satisfies CartLine[];
   }, [items]);
 
-  if (!isAuthenticated) {
-    return (
-      <div className="main-class flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Please sign in to checkout</h2>
-          <a href="/login" className="text-indigo-600 hover:text-indigo-700">
-            Go to login
-          </a>
-        </div>
-      </div>
-    );
-  }
+  const emailValid = isValidEmail(email);
 
   return (
     <div className="main-class">
@@ -87,12 +88,9 @@ export default function CheckoutPage() {
                   <div key={line.id} className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="font-semibold truncate">{line.name}</div>
-                      <div className="text-sm text-gray-600">
-                        Qty: {line.quantity}
-                      </div>
+                      <div className="text-sm text-gray-600">Qty: {line.quantity}</div>
                     </div>
                     <div className="text-right font-semibold">
-                      {/* formattedTotalPrice is for the entire cart; use unit line totals for line display */}
                       {new Intl.NumberFormat('en-US', {
                         style: 'currency',
                         currency: line.currency.toUpperCase(),
@@ -108,6 +106,25 @@ export default function CheckoutPage() {
               <span className="font-semibold">{formattedTotalPrice}</span>
             </div>
 
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="checkout-email">
+                Email (required)
+              </label>
+              <input
+                id="checkout-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                placeholder="you@example.com"
+              />
+              {!emailValid && email.trim().length > 0 && (
+                <p className="mt-2 text-sm text-red-600">Please enter a valid email address.</p>
+              )}
+            </div>
+
             {error && (
               <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
                 {error}
@@ -115,23 +132,38 @@ export default function CheckoutPage() {
             )}
 
             <button
-              disabled={processing || items.length === 0}
+              disabled={processing || items.length === 0 || !emailValid}
               onClick={async () => {
                 setError('');
                 setProcessing(true);
                 try {
-                  const response = await ordersApi.create(
-                    orderSummaryLines,
-                    { /* shipping_address placeholder */ }
-                  );
+                  const response = await ordersApi.create(orderSummaryLines, {}, email.trim());
 
                   const data = response.data as {
                     order_id?: string;
                     confirmation_number?: string;
+                    access_token?: string;
+                    refresh_token?: string;
+                    user?: { id: string; email: string | null };
                   };
 
+                  if (data.access_token && data.refresh_token && data.user) {
+                    localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+                    localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+
+                    // AuthContext expects `user` with id/email.
+                    localStorage.setItem(
+                      USER_KEY,
+                      JSON.stringify({ id: data.user.id, email: data.user.email ?? '' })
+                    );
+
+                    setUser({ id: data.user.id, email: data.user.email ?? '' });
+                  }
+
                   clearCart();
-                  const confirmation = data.confirmation_number || data.order_id || '';
+                  const confirmation =
+                    data.confirmation_number || data.order_id || '';
+
                   navigate(`/orders?confirmation=${encodeURIComponent(confirmation)}`);
                 } catch (e: unknown) {
                   const message = e instanceof Error ? e.message : 'Checkout failed';
@@ -140,7 +172,7 @@ export default function CheckoutPage() {
                   setProcessing(false);
                 }
               }}
-              className="mt-8 w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition disabled:opacity-50"
+              className="mt-8 w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {processing ? 'Processing...' : 'Complete Purchase'}
             </button>

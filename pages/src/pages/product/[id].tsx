@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useShoppingCart } from 'use-shopping-cart';
 import { useParams } from 'react-router-dom';
 import { productsApi } from '../../useApi';
