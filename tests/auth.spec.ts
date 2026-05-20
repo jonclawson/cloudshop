@@ -61,20 +61,30 @@ test.describe('Authentication', () => {
     page,
   }) => {
     const API_BASE_URL = 'http://localhost:8787';
-    const newPassword = `password_${Date.now()}`;
+    const initialPassword = 'password123';
+    const signupEmail = `reset_${Date.now()}_${Math.random().toString(16).slice(2)}@example.com`;
+    const newPassword = `password_${Date.now()}_new`;
 
-    // Request reset token (dev-only hook)
+    // 1) Create user via API (so this test is self-contained)
+    const signupResp = await page.request.post(`${API_BASE_URL}/api/auth/signup`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: JSON.stringify({ email: signupEmail, password: initialPassword }),
+    });
+    expect(signupResp.status()).toBe(201);
+
+    // 2) Request reset token (dev-only hook)
     const forgotResp = await page.request.post(`${API_BASE_URL}/api/auth/forgot-password`, {
       headers: { 'Content-Type': 'application/json' },
-      data: { email: signupEmail },
+      data: JSON.stringify({ email: signupEmail }),
     });
     expect(forgotResp.status()).toBe(200);
+
     const forgotJson = (await forgotResp.json()) as { reset_token?: string; error?: string };
     expect(forgotJson.reset_token, 'reset_token should be returned in development').toBeTruthy();
 
     const token = forgotJson.reset_token as string;
 
-    // Reset password UI
+    // 3) Reset password UI
     await page.goto(`${BASE_URL}/reset-password?token=${encodeURIComponent(token)}`);
     await page.fill('input[type="password"]', newPassword);
     await page.locator('form').locator('input[type="password"]').nth(1).fill(newPassword);
@@ -84,7 +94,7 @@ test.describe('Authentication', () => {
       timeout: 5000,
     });
 
-    // Login with new password
+    // 4) Login with new password
     await page.goto(`${BASE_URL}/login`);
     await page.fill('input[type="email"]', signupEmail);
     await page.fill('input[type="password"]', newPassword);
@@ -92,12 +102,13 @@ test.describe('Authentication', () => {
 
     const errorDiv = page.locator('text=Login failed');
 
-    // Either we redirect to /, or we show "Login failed".
     const redirectPromise = page.waitForURL(`${BASE_URL}/`, { timeout: 5000 });
     const loginFailurePromise = errorDiv
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => {
-        throw new Error('Expected login to succeed after password reset, but UI showed "Login failed".');
+        throw new Error(
+          'Expected login to succeed after password reset, but UI showed "Login failed".'
+        );
       });
 
     await Promise.race([redirectPromise, loginFailurePromise]);

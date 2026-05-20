@@ -2,9 +2,16 @@ import React, { useState } from 'react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787';
 
+type ForgotPasswordResponse = {
+  message?: string;
+  error?: string;
+  reset_token?: string;
+};
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<string>('');
+  const [devResetToken, setDevResetToken] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -13,6 +20,7 @@ export default function ForgotPasswordPage() {
     setIsSubmitting(true);
     setError('');
     setStatus('');
+    setDevResetToken(null);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
@@ -22,7 +30,7 @@ export default function ForgotPasswordPage() {
       });
 
       const data = (await response.json().catch(() => ({}))) as
-        | { message?: string; error?: string }
+        | ForgotPasswordResponse
         | undefined;
 
       if (!response.ok) {
@@ -31,6 +39,9 @@ export default function ForgotPasswordPage() {
       }
 
       setStatus(data?.message || 'If your email exists, you will receive a reset link.');
+      if (data?.reset_token) {
+        setDevResetToken(data.reset_token);
+      }
     } catch {
       setError('Network error while requesting password reset');
     } finally {
@@ -51,7 +62,19 @@ export default function ForgotPasswordPage() {
 
         {status && (
           <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-800 rounded">
-            {status}
+            <div>{status}</div>
+
+            {devResetToken ? (
+              <div className="mt-3">
+                <div className="text-sm font-semibold">Dev reset link:</div>
+                <a
+                  href={`/reset-password?token=${encodeURIComponent(devResetToken)}`}
+                  className="text-sm text-green-900 underline hover:text-green-700 break-all"
+                >
+                  /reset-password?token={devResetToken}
+                </a>
+              </div>
+            ) : null}
           </div>
         )}
 
