@@ -310,6 +310,27 @@ export const adminApi = {
   syncProducts: () =>
     sendRequest<unknown>(`/api/admin/sync-products`, {
       method: 'POST',
+      auth: true,
       body: {},
+    }),
+
+  getUsers: () =>
+    sendRequest<{ users?: unknown[] }>(`/api/admin/users`, {
+      auth: true,
+    }),
+
+  getUserById: (id: string) =>
+    sendRequest<unknown>(`/api/admin/users/${id}`, {
+      auth: true,
+    }),
+
+  getOrders: () =>
+    sendRequest<{ orders?: unknown[] }>(`/api/admin/orders`, {
+      auth: true,
+    }),
+
+  getOrderById: (id: string) =>
+    sendRequest<unknown>(`/api/admin/orders/${id}`, {
+      auth: true,
     }),
 };

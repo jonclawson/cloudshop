@@ -6,6 +6,8 @@ export const users = sqliteTable('users', {
   id: text('id').primaryKey().default('uuid()'),
   email: text('email').notNull().unique(),
   password_hash: text('password_hash').notNull(),
+  // SQLite doesn't have a real boolean type; Drizzle maps this to INTEGER (0/1)
+  admin: integer('admin', { mode: 'boolean' }).notNull().default(false),
   created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
   updated_at: integer('updated_at').default(sql`CURRENT_TIMESTAMP`),
 });

@@ -1,6 +1,10 @@
-export async function initializeSchema(db: D1Database): Promise<void> {
+import { eq } from 'drizzle-orm';
+import { getDb, schema } from '../db';
+import { hashPassword } from '../services/authUtils';
+
+export async function initializeSchema(db: D1Database, environment: string): Promise<void> {
   try {
-    // Create users table
+    // Create users table (base columns)
     await db
       .prepare(
         `
@@ -14,6 +18,23 @@ export async function initializeSchema(db: D1Database): Promise<void> {
     `
       )
       .run();
+
+    // Add users.admin column for existing DBs.
+    // SQLite doesn't support MODIFY COLUMN; we use ADD COLUMN + ignore if it already exists.
+    try {
+      await db
+        .prepare(`
+          ALTER TABLE users ADD COLUMN admin INTEGER NOT NULL DEFAULT 0
+        `)
+        .run();
+    } catch (err) {
+      // If column already exists, ALTER TABLE will throw. That's fine.
+      // Re-throw only on unexpected errors.
+      const message = err instanceof Error ? err.message : '';
+      if (!message.toLowerCase().includes('duplicate') && !message.toLowerCase().includes('exists')) {
+        throw err;
+      }
+    }
 
     // Create refresh_tokens table
     await db
@@ -172,6 +193,43 @@ export async function initializeSchema(db: D1Database): Promise<void> {
     `
       )
       .run();
+
+    // Seed testing admin user (so Playwright can authenticate admin routes)
+    // Only seed in non-production.
+    if (environment !== 'production') {
+      try {
+        const adminEmail = 'admin@example.com';
+        const adminPassword = 'password123';
+
+        const ormDb = getDb(db);
+        const existing = await ormDb
+          .select({ id: schema.users.id, admin: schema.users.admin })
+          .from(schema.users)
+          .where(eq(schema.users.email, adminEmail))
+          .limit(1);
+
+        if (existing.length === 0) {
+          const userId = crypto.randomUUID();
+          const passwordHash = await hashPassword(adminPassword);
+
+          await ormDb.insert(schema.users).values({
+            id: userId,
+            email: adminEmail,
+            password_hash: passwordHash,
+            admin: true,
+          });
+        } else if (!existing[0].admin) {
+          await ormDb
+            .update(schema.users)
+            .set({ admin: true })
+            .where(eq(schema.users.id, existing[0].id));
+        }
+      } catch (seedError) {
+        // Don't fail the whole schema init if seeding fails; otherwise we can leave
+        // the DB half-initialized and break auth flows.
+        console.error('Admin seed failed (continuing):', seedError);
+      }
+    }
 
     console.log('✓ Database schema initialized successfully');
   } catch (error) {
