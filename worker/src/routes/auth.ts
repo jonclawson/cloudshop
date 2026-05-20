@@ -334,17 +334,72 @@ auth.post('/reset-password', async (c) => {
 
     const resetRow = tokenRow[0];
 
+    const userIdToUpdate = resetRow.user_id;
     const newPasswordHash = await hashPassword(new_password);
+
+    // Confirm the correct user row is being updated.
+    const userBefore = await db
+      .select({ password_hash: users.password_hash })
+      .from(users)
+      .where(eq(users.id, userIdToUpdate))
+      .limit(1);
 
     await db
       .update(users)
       .set({ password_hash: newPasswordHash })
-      .where(eq(users.id, resetRow.user_id));
+      .where(eq(users.id, userIdToUpdate));
+
+    const userAfter = await db
+      .select({ password_hash: users.password_hash })
+      .from(users)
+      .where(eq(users.id, userIdToUpdate))
+      .limit(1);
+
+    const updated =
+      userAfter.length > 0 && userAfter[0].password_hash === newPasswordHash;
+
+    // Confirm the login verification would succeed with the stored hash.
+    const canVerifyNewPassword =
+      userAfter.length > 0
+        ? await verifyPassword(new_password, userAfter[0].password_hash)
+        : false;
+
+    // Log for local debugging (IDs being used + whether update stuck + verify result).
+    console.log('🔐 reset-password', {
+      token_hash_looked_up_prefix: tokenHash.slice(0, 10),
+      reset_token_row_id: resetRow.id,
+      reset_token_user_id: userIdToUpdate,
+      updated,
+      canVerifyNewPassword,
+      before_hash_prefix: userBefore[0]?.password_hash?.slice(0, 10),
+      after_hash_prefix: userAfter[0]?.password_hash?.slice(0, 10),
+    });
+
+    if (!updated) {
+      return c.json({ error: 'Password update did not persist' }, 500);
+    }
 
     await db
       .update(passwordResetTokens)
       .set({ used_at: nowSeconds })
       .where(eq(passwordResetTokens.id, resetRow.id));
+
+    const isNonProd = c.env.ENVIRONMENT !== 'production';
+    if (isNonProd) {
+      return c.json(
+        {
+          message: 'Password updated successfully',
+          debug: {
+            reset_token_row_id: resetRow.id,
+            reset_token_user_id: userIdToUpdate,
+            canVerifyNewPassword,
+            before_hash_prefix: userBefore[0]?.password_hash?.slice(0, 10),
+            after_hash_prefix: userAfter[0]?.password_hash?.slice(0, 10),
+          },
+        },
+        200
+      );
+    }
 
     return c.json({ message: 'Password updated successfully' }, 200);
   } catch (error) {
