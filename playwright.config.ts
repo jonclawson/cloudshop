@@ -16,6 +16,8 @@ export default defineConfig({
   reporter: 'html',
   use: {
     baseURL: 'http://localhost:5173',
+    // Save screenshots only when a test fails (includes retries too).
+    screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },
 
