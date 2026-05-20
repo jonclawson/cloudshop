@@ -19,6 +19,15 @@ export const refreshTokens = sqliteTable('refresh_tokens', {
   created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const passwordResetTokens = sqliteTable('password_reset_tokens', {
+  id: text('id').primaryKey().default('uuid()'),
+  user_id: text('user_id').notNull(),
+  token_hash: text('token_hash').notNull(),
+  expires_at: integer('expires_at').notNull(),
+  created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
+  used_at: integer('used_at'),
+});
+
 // Products table
 export const products = sqliteTable('products', {
   id: text('id').primaryKey().default('uuid()'),

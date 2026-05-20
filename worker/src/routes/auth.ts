@@ -1,18 +1,21 @@
 import { Hono } from 'hono';
 import { SignJWT, jwtVerify } from 'jose';
 import { getDb } from '../db';
-import { users, refreshTokens } from '../schema';
-import { eq } from 'drizzle-orm';
+import { users, refreshTokens, passwordResetTokens } from '../schema';
+import { eq, gt, isNull } from 'drizzle-orm';
+import { getMailchannelsService } from '../services/mock';
 
 const auth = new Hono<{ Bindings: CloudshopBindings }>();
+
 
 type CloudshopBindings = {
   DB: D1Database;
   JWT_SECRET?: string;
   ENVIRONMENT?: string;
+  USE_MOCKS?: string;
 };
 
-// Hash password using PBKDF2
+// Hash password using PBKDF2 (random salt; used for password hashing/verification)
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -28,6 +31,18 @@ async function hashPassword(password: string): Promise<string> {
   combined.set(salt);
   combined.set(hash, salt.length);
   return btoa(String.fromCharCode(...combined));
+}
+
+// Deterministic hash for password reset tokens (so we can look up by token_hash)
+async function hashResetToken(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(token);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const arr = new Uint8Array(digest);
+  // hex encoding is easy to compare and store in TEXT
+  return Array.from(arr)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 // Verify password
@@ -215,6 +230,126 @@ auth.post('/refresh', async (c) => {
   } catch (error) {
     console.error('Refresh error:', error);
     return c.json({ error: 'Invalid refresh token' }, 401);
+  }
+});
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function isValidEmail(email: string): boolean {
+  // Pragmatic email validation for UX; backend must not trust it.
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+auth.post('/forgot-password', async (c) => {
+  try {
+    const { email } = (await c.req.json()) as { email: string };
+
+    if (!email) {
+      return c.json({ error: 'Email required' }, 400);
+    }
+
+    const normalized = normalizeEmail(email);
+    if (!isValidEmail(normalized)) {
+      // Avoid enumeration: still respond success shape.
+      return c.json({ message: 'If your email exists, you will receive a reset link' }, 200);
+    }
+
+    const db = getDb(c.env.DB);
+    const userRow = await db.select().from(users).where(eq(users.email, normalized)).limit(1);
+
+    // Always respond success to prevent account enumeration.
+    if (userRow.length === 0) {
+      return c.json({ message: 'If your email exists, you will receive a reset link' }, 200);
+    }
+
+    const user = userRow[0];
+    const resetToken = crypto.randomUUID();
+    const resetTokenHash = await hashResetToken(resetToken);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const expiresAt = nowSeconds + 60 * 60; // 1 hour
+
+    await db.insert(passwordResetTokens).values({
+      id: crypto.randomUUID(),
+      user_id: user.id,
+      token_hash: resetTokenHash,
+      expires_at: expiresAt,
+      used_at: null,
+    });
+
+    const useMocks = c.env.USE_MOCKS === 'true';
+    const mailService = await getMailchannelsService(useMocks);
+    if (mailService && 'sendPasswordReset' in mailService) {
+      await mailService.sendPasswordReset(normalized, resetToken);
+    }
+
+    // Dev-only hook: deterministic Playwright testing.
+    // Be defensive: in local/e2e we want tokens back, but avoid doing it in production.
+    if (c.env.ENVIRONMENT !== 'production') {
+      return c.json(
+        { message: 'Password reset email queued (dev)', reset_token: resetToken },
+        200
+      );
+    }
+
+    return c.json({ message: 'If your email exists, you will receive a reset link' }, 200);
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return c.json({ error: 'Forgot password failed' }, 500);
+  }
+});
+
+auth.post('/reset-password', async (c) => {
+  try {
+    const { token, new_password } = (await c.req.json()) as {
+      token: string;
+      new_password: string;
+    };
+
+    if (!token || !new_password) {
+      return c.json({ error: 'Token and new password required' }, 400);
+    }
+
+    if (new_password.length < 8) {
+      return c.json({ error: 'Password must be at least 8 characters' }, 400);
+    }
+
+    const db = getDb(c.env.DB);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+
+    const tokenHash = await hashResetToken(token);
+
+    const tokenRow = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token_hash, tokenHash))
+      .where(gt(passwordResetTokens.expires_at, nowSeconds))
+      .where(isNull(passwordResetTokens.used_at))
+      .limit(1);
+
+    if (tokenRow.length === 0) {
+      return c.json({ error: 'Invalid or expired token' }, 400);
+    }
+
+    const resetRow = tokenRow[0];
+
+    const newPasswordHash = await hashPassword(new_password);
+
+    await db
+      .update(users)
+      .set({ password_hash: newPasswordHash })
+      .where(eq(users.id, resetRow.user_id));
+
+    await db
+      .update(passwordResetTokens)
+      .set({ used_at: nowSeconds })
+      .where(eq(passwordResetTokens.id, resetRow.id));
+
+    return c.json({ message: 'Password updated successfully' }, 200);
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return c.json({ error: 'Reset password failed' }, 500);
   }
 });
 

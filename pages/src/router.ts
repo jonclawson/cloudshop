@@ -8,10 +8,12 @@ export type Path =
   | `/admin/sync-products`
   | `/cart`
   | `/checkout`
+  | `/forgot-password`
   | `/login`
   | `/order/:id`
   | `/orders`
   | `/product/:id`
+  | `/reset-password`
 
 export type Params = {
   '/order/:id': { id: string }

@@ -46,7 +46,7 @@ export default function AdminSyncProductsPage() {
 
           {result && (
             <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-              <p className="font-semibold">Sync Complete!</p>
+              <p className="font-semibold">Sync Complete</p>
               <p>Synced {result.synced_count} products</p>
               <p className="text-sm mt-2">{result.synced_at}</p>
             </div>

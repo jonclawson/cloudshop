@@ -124,6 +124,23 @@ export async function initializeSchema(db: D1Database): Promise<void> {
       )
       .run();
 
+    // Create password_reset_tokens table
+    await db
+      .prepare(
+        `
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        used_at INTEGER,
+        created_at INTEGER DEFAULT (strftime('%s', 'now')),
+        FOREIGN KEY(user_id) REFERENCES users(id)
+      )
+    `
+      )
+      .run();
+
     // Create cart_sessions table
     await db
       .prepare(
@@ -132,7 +149,7 @@ export async function initializeSchema(db: D1Database): Promise<void> {
         id TEXT PRIMARY KEY,
         user_id TEXT,
         session_key TEXT NOT NULL UNIQUE,
-        cart_data TEXT NOT NULL,
+        cart_data TEXT NOT NULL, // JSON string
         expires_at INTEGER NOT NULL,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         FOREIGN KEY(user_id) REFERENCES users(id)

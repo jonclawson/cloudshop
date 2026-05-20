@@ -200,7 +200,7 @@ export const mockMailchannels = {
   sendPasswordReset: async (email: string, resetToken: string) => {
     const html = `
       <h2>Reset Your Password</h2>
-      <p><a href="https://cloudshop.example.com/reset-password?token=${resetToken}">Click here to reset your password</a></p>
+      <p><a href="http://localhost:5173/reset-password?token=${resetToken}">Click here to reset your password</a></p>
       <p>This link expires in 1 hour.</p>
     `;
     return mockMailchannels.sendEmail(email, 'Reset Your Password', html);
