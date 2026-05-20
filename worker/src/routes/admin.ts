@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 import { getDb, schema } from '../db';
 import { verifyJWT } from '../middleware/auth';
 import { mockPrintful } from '../services/mock';
@@ -39,6 +39,69 @@ admin.post('/sync-products', verifyJWT, async (c) => {
   try {
     await assertAdmin(c);
     const result = await mockPrintful.syncProducts();
+    const db = getDb(c.env.DB);
+    
+    const syncedAtMs = result.synced_at;
+    const printfulProducts = result.products;
+    
+    const printfulProductIds = printfulProducts.map((p) => String(p.external_id));
+    const printfulVariantIds = printfulProducts.flatMap((p) => p.variants.map((v) => String(v.external_id)));
+    
+    // Remove existing rows for this Printful sync so IDs stay consistent for joins.
+    if (printfulVariantIds.length > 0) {
+      await db
+      .delete(schema.productVariants)
+      .where(inArray(schema.productVariants.printful_variant_id, printfulVariantIds));
+    }
+    if (printfulProductIds.length > 0) {
+      await db
+      .delete(schema.products)
+      .where(inArray(schema.products.printful_product_id, printfulProductIds));
+    }
+    
+    // Insert products first (so product_id FK constraints pass).
+    const productRows = printfulProducts.map((p) => {
+      const variantPrices = p.variants.map((v) => Number(v.price));
+      const basePrice = Number.isFinite(Math.min(...variantPrices)) ? Math.min(...variantPrices) : 0;
+
+      return {
+        id: String(p.external_id), // stable ID for cart/order joins
+        name: p.title,
+        sku: `printful-${String(p.external_id)}`,
+        description: p.description,
+        base_price: basePrice,
+        printful_product_id: String(p.external_id),
+        printful_sync_at: syncedAtMs,
+      };
+    });
+    
+    if (productRows.length > 0) {
+      await db.insert(schema.products).values(productRows);
+    }
+
+    const variantRows = printfulProducts.flatMap((p) =>
+      p.variants.map((v) => ({
+        id: String(v.external_id), // stable ID for cart/order joins
+        product_id: String(p.external_id),
+        size: v.size,
+        color: v.color,
+        price_override: Number(v.price),
+        printful_variant_id: String(v.external_id),
+      }))
+    );
+    
+    if (variantRows.length > 0) {
+      await db.insert(schema.productVariants).values(variantRows);
+    }
+    
+    await db.insert(schema.productSyncLog).values({
+      id: crypto.randomUUID(),
+      synced_at: syncedAtMs,
+      product_count: result.count,
+      variant_count: printfulVariantIds.length,
+      error_message: null,
+    });
+
     return c.json({
       success: true,
       synced_count: result.count,

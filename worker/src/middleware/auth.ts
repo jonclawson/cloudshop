@@ -32,7 +32,9 @@ export const verifyJWT: MiddlewareHandler<{ Variables: { auth: AuthPayload } }> 
     c.set('auth', { userId, type });
     await next();
   } catch (error) {
-    console.error('JWT verification failed:', error);
+    // Avoid noisy stack traces for expected auth failures (the client will handle 401 + refresh).
+    // console.warn('JWT verification failed:', error);
+
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
 };
