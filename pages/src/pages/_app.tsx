@@ -1,9 +1,9 @@
-import { Outlet } from 'react-router-dom';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { Link } from 'react-router-dom';
 
 export default function GlobalLayout() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <>
@@ -23,9 +23,16 @@ export default function GlobalLayout() {
                   <a href="/cart" className="text-gray-700 hover:text-gray-900">
                     Cart
                   </a>
-                  <a href="/login" className="text-gray-700 hover:text-gray-900">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await logout();
+                      navigate('/login', { replace: true });
+                    }}
+                    className="text-gray-700 hover:text-gray-900"
+                  >
                     Logout
-                  </a>
+                  </button>
                 </>
               ) : (
                 <a href="/login" className="text-gray-700 hover:text-gray-900">
