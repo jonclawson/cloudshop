@@ -17,6 +17,9 @@ export default function GlobalLayout() {
             <nav className="flex space-x-4">
               {isAuthenticated ? (
                 <>
+                  <a href="/" className="text-gray-700 hover:text-gray-900">
+                    Shop
+                  </a>
                   <a href="/orders" className="text-gray-700 hover:text-gray-900">
                     Orders
                   </a>

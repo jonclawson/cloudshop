@@ -7,7 +7,7 @@ export type Path =
   | `/`
   | `/admin/orders`
   | `/admin/orders/:id`
-  | `/admin/sync-products`
+  | `/admin/products`
   | `/admin/users`
   | `/admin/users/:id`
   | `/cart`

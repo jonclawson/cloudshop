@@ -1,31 +1,40 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminApi } from '../../useApi';
-import { useAuth } from '../../AuthContext';
+import { adminApi } from '../../../useApi';
+import { useAuth } from '../../../AuthContext';
 
-type AdminUser = {
+type AdminOrder = {
   id: string;
-  email: string;
-  admin: boolean;
-  created_at?: string;
+  status: string;
+  total_price: number;
+  created_at: string;
+  user_id?: string;
+  user_email?: string;
 };
 
-export default function AdminUsersPage() {
+export default function AdminOrdersPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const createdAtText = useMemo(
+  const moneyFormatter = useMemo(
     () =>
-      (value: string | undefined) => {
-        if (!value) return '—';
-        return value;
-      },
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
     []
   );
+
+  const formatMoney = (value: number | undefined) => {
+    if (value === undefined || value === null || !Number.isFinite(value)) return '—';
+    return moneyFormatter.format(value);
+  };
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -35,12 +44,12 @@ export default function AdminUsersPage() {
       setErrorMessage(null);
 
       try {
-        const response = await adminApi.getUsers();
-        setUsers((response.data.users as AdminUser[]) || []);
+        const response = await adminApi.getOrders();
+        setOrders((response.data.orders as AdminOrder[]) || []);
       } catch (err) {
-        console.error('Failed to fetch admin users:', err);
-        setErrorMessage('Not authorized to view users.');
-        setUsers([]);
+        console.error('Failed to fetch admin orders:', err);
+        setErrorMessage('Not authorized to view orders.');
+        setOrders([]);
       } finally {
         setLoading(false);
       }
@@ -65,7 +74,7 @@ export default function AdminUsersPage() {
   return (
     <div className="main-class">
       <div className="mb-6 flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold">Admin - Users</h1>
+        <h1 className="text-3xl font-bold">Admin - Orders</h1>
         <button
           type="button"
           onClick={() => navigate('/')}
@@ -83,38 +92,29 @@ export default function AdminUsersPage() {
           </a>
         </div>
       ) : loading ? (
-        <p>Loading users…</p>
-      ) : users.length === 0 ? (
+        <p>Loading orders…</p>
+      ) : orders.length === 0 ? (
         <div className="text-center border border-gray-200 rounded-lg p-6">
-          <p className="text-gray-600">No users found.</p>
+          <p className="text-gray-600">No orders found.</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {users.map((user) => (
+          {orders.map((order) => (
             <button
-              key={user.id}
+              key={order.id}
               type="button"
-              onClick={() => navigate(`/admin/users/${user.id}`)}
+              onClick={() => navigate(`/admin/orders/${order.id}`)}
               className="w-full border border-gray-200 rounded-lg p-4 text-left hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
             >
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-semibold truncate">{user.email}</p>
-                  <p className="text-sm text-gray-600">{createdAtText(user.created_at)}</p>
+                  <p className="font-semibold truncate">Order #{order.id}</p>
+                  <p className="text-sm text-gray-600 truncate">{order.user_email ?? order.user_id ?? '—'}</p>
+                  <p className="text-sm text-gray-600 truncate">{order.created_at ?? '—'}</p>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span
-                    className={[
-                      'rounded-md border px-2 py-1 text-xs font-medium',
-                      user.admin
-                        ? 'border-green-400 bg-green-100 text-green-800'
-                        : 'border-gray-200 bg-white text-gray-700',
-                    ].join(' ')}
-                  >
-                    {user.admin ? 'Admin' : 'User'}
-                  </span>
-                  <span className="text-sm text-indigo-700 font-medium">View →</span>
+                <div className="text-right">
+                  <p className="font-semibold">{formatMoney(order.total_price)}</p>
+                  <p className="text-sm text-gray-600">{order.status ?? '—'}</p>
                 </div>
               </div>
             </button>
