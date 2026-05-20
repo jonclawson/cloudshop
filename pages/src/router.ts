@@ -8,6 +8,7 @@ export type Path =
   | `/admin/orders`
   | `/admin/orders/:id`
   | `/admin/products`
+  | `/admin/sync-products`
   | `/admin/users`
   | `/admin/users/:id`
   | `/cart`

@@ -3,7 +3,7 @@ import { adminApi } from '../../useApi';
 import { useAuth } from '../../AuthContext';
 
 export default function AdminSyncProductsPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
@@ -21,11 +21,11 @@ export default function AdminSyncProductsPage() {
     }
   };
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user?.admin) {
     return (
       <div className="main-class flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Please sign in to view admin</h2>
+          <h2 className="text-2xl font-bold mb-4">Unauthorized, Please sign in to view admin</h2>
           <a href="/login" className="text-indigo-600 hover:text-indigo-700">
             Go to login
           </a>

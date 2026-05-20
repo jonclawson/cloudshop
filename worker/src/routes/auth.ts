@@ -4,6 +4,7 @@ import { getDb } from '../db';
 import { users, refreshTokens, passwordResetTokens } from '../schema';
 import { eq, gt, isNull } from 'drizzle-orm';
 import { getMailchannelsService } from '../services/mock';
+import { verifyJWT } from '../middleware/auth';
 
 const auth = new Hono<{ Bindings: CloudshopBindings }>();
 
@@ -104,6 +105,7 @@ auth.post('/signup', async (c) => {
     const environment = c.env.ENVIRONMENT ?? 'development';
     const normalizedEmail = email.trim().toLowerCase();
     const adminEmail = 'admin@example.com';
+    const isAdmin = environment !== 'production' && normalizedEmail === adminEmail;
 
     const existing = await db
       .select({ id: users.id })
@@ -136,7 +138,7 @@ auth.post('/signup', async (c) => {
 
         return c.json(
           {
-            user: { id: userId, email: normalizedEmail },
+            user: { id: userId, email: normalizedEmail, admin: true },
             access_token: accessToken,
             refresh_token: refreshToken,
           },
@@ -154,7 +156,7 @@ auth.post('/signup', async (c) => {
       id: userId,
       email: normalizedEmail,
       password_hash: passwordHash,
-      admin: environment !== 'production' && normalizedEmail === adminEmail ? true : false,
+      admin: isAdmin,
     });
 
     const jwtSecret = c.env.JWT_SECRET || 'dev-secret';
@@ -172,7 +174,7 @@ auth.post('/signup', async (c) => {
 
     return c.json(
       {
-        user: { id: userId, email },
+        user: { id: userId, email: normalizedEmail, admin: isAdmin },
         access_token: accessToken,
         refresh_token: refreshToken,
       },
@@ -194,10 +196,17 @@ auth.post('/login', async (c) => {
     }
 
     const db = getDb(c.env.DB);
+    const normalizedEmail = email.trim().toLowerCase();
+
     const user = await db
-      .select()
+      .select({
+        id: users.id,
+        email: users.email,
+        admin: users.admin,
+        password_hash: users.password_hash,
+      })
       .from(users)
-      .where(eq(users.email, email))
+      .where(eq(users.email, normalizedEmail))
       .limit(1);
 
     if (user.length === 0) {
@@ -223,7 +232,7 @@ auth.post('/login', async (c) => {
     });
 
     return c.json({
-      user: { id: user[0].id, email: user[0].email },
+      user: { id: user[0].id, email: user[0].email, admin: !!user[0].admin },
       access_token: accessToken,
       refresh_token: refreshToken,
     });
@@ -268,6 +277,33 @@ auth.post('/refresh', async (c) => {
   } catch (error) {
     console.error('Refresh error:', error);
     return c.json({ error: 'Invalid refresh token' }, 401);
+  }
+});
+
+// GET /me - return current authenticated user (including admin flag)
+auth.get('/me', verifyJWT, async (c) => {
+  try {
+    const auth = c.get('auth') as { userId: string } | undefined;
+    const userId = auth?.userId;
+
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const db = getDb(c.env.DB);
+    const user = await db
+      .select({ id: users.id, email: users.email, admin: users.admin })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (user.length === 0) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    return c.json({ user: user[0] });
+  } catch {
+    return c.json({ error: 'Unauthorized' }, 401);
   }
 });
 
