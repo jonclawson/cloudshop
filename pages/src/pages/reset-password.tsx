@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import PasswordInput from '../components/PasswordInput';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787';
 
@@ -85,23 +86,27 @@ export default function ResetPasswordPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">New password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setNewPassword(e.target.value)
+              }
               required
+              name="new_password"
+              autoComplete="new-password"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Confirm password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setConfirmPassword(e.target.value)
+              }
               required
+              name="confirm_password"
+              autoComplete="new-password"
             />
           </div>
 

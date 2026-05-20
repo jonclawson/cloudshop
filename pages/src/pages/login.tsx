@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate } from 'react-router-dom';
+import PasswordInput from '../components/PasswordInput';
 
 export default function LoginPage() {
   const { login, signup } = useAuth();
@@ -47,7 +48,9 @@ export default function LoginPage() {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setEmail(e.target.value)
+              }
               className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               required
             />
@@ -57,12 +60,14 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-gray-700">
               Password
             </label>
-            <input
-              type="password"
+            <PasswordInput
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setPassword(e.target.value)
+              }
               required
+              autoComplete="current-password"
+              name="password"
             />
           </div>
 
