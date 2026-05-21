@@ -52,6 +52,15 @@ export async function initializeSchema(db: D1Database, environment: string): Pro
       )
       .run();
 
+    // In dev, products/variants are disposable (orders/products are empty).
+    // Drop+recreate so we don't keep old printful_* columns around.
+    if (environment !== 'production') {
+      await db.prepare(`DROP TABLE IF EXISTS order_items`).run();
+      await db.prepare(`DROP TABLE IF EXISTS orders`).run();
+      await db.prepare(`DROP TABLE IF EXISTS product_variants`).run();
+      await db.prepare(`DROP TABLE IF EXISTS products`).run();
+    }
+
     // Create products table
     await db
       .prepare(
@@ -62,8 +71,11 @@ export async function initializeSchema(db: D1Database, environment: string): Pro
         sku TEXT NOT NULL UNIQUE,
         description TEXT,
         base_price REAL NOT NULL,
-        printful_product_id TEXT,
-        printful_sync_at INTEGER,
+
+        provider TEXT NOT NULL,
+        provider_product_id TEXT NOT NULL,
+        provider_sync_at INTEGER,
+
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       )
@@ -81,7 +93,9 @@ export async function initializeSchema(db: D1Database, environment: string): Pro
         size TEXT,
         color TEXT,
         price_override REAL,
-        printful_variant_id TEXT,
+
+        provider_variant_id TEXT NOT NULL,
+
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         FOREIGN KEY(product_id) REFERENCES products(id)
       )
@@ -170,7 +184,7 @@ export async function initializeSchema(db: D1Database, environment: string): Pro
         id TEXT PRIMARY KEY,
         user_id TEXT,
         session_key TEXT NOT NULL UNIQUE,
-        cart_data TEXT NOT NULL, // JSON string
+        cart_data TEXT NOT NULL,
         expires_at INTEGER NOT NULL,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         FOREIGN KEY(user_id) REFERENCES users(id)

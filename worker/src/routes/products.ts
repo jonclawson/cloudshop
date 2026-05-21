@@ -1,6 +1,6 @@
-import { Hono } from "hono";
-import { desc, eq, inArray } from "drizzle-orm";
-import { getDb, schema } from "../db";
+import { Hono } from 'hono';
+import { desc, eq, inArray } from 'drizzle-orm';
+import { getDb, schema } from '../db';
 
 type Bindings = {
   DB: D1Database;
@@ -32,13 +32,16 @@ function formatVariantTitle(size: string | null | undefined, color: string | nul
   return `${safeSize} / ${safeColor}`.replace(/\s\/\s/g, ' / ');
 }
 
-function toProductResponse(productRow: typeof schema.products.$inferSelect, variantRows: typeof schema.productVariants.$inferSelect[]): ProductResponse {
-    const variants = variantRows.map((v) => {
-      const priceDollars = v.price_override ?? productRow.base_price;
+function toProductResponse(
+  productRow: typeof schema.products.$inferSelect,
+  variantRows: typeof schema.productVariants.$inferSelect[]
+): ProductResponse {
+  const variants: ProductVariantResponse[] = variantRows.map((v) => {
+    const priceDollars = v.price_override ?? productRow.base_price;
 
     return {
       id: String(v.id),
-      external_id: v.printful_variant_id ?? undefined,
+      external_id: v.provider_variant_id ?? undefined,
       title: formatVariantTitle(v.size, v.color),
       size: v.size,
       color: v.color,
@@ -48,7 +51,7 @@ function toProductResponse(productRow: typeof schema.products.$inferSelect, vari
 
   return {
     id: String(productRow.id),
-    external_id: productRow.printful_product_id ?? String(productRow.id),
+    external_id: productRow.provider_product_id ?? String(productRow.id),
     title: productRow.name,
     name: productRow.name,
     description: productRow.description,
@@ -66,7 +69,7 @@ products.get('/', async (c) => {
         name: schema.products.name,
         description: schema.products.description,
         base_price: schema.products.base_price,
-        printful_product_id: schema.products.printful_product_id,
+        provider_product_id: schema.products.provider_product_id,
       })
       .from(schema.products)
       .orderBy(desc(schema.products.created_at))
@@ -89,7 +92,7 @@ products.get('/', async (c) => {
         size: schema.productVariants.size,
         color: schema.productVariants.color,
         price_override: schema.productVariants.price_override,
-        printful_variant_id: schema.productVariants.printful_variant_id,
+        provider_variant_id: schema.productVariants.provider_variant_id,
       })
       .from(schema.productVariants)
       .where(inArray(schema.productVariants.product_id, productIds));
@@ -98,16 +101,13 @@ products.get('/', async (c) => {
     for (const row of variantRows) {
       const key = String(row.product_id);
       const list = byProductId.get(key) ?? [];
-      list.push(row as any);
+      list.push(row);
       byProductId.set(key, list);
     }
 
     const responseProducts = productRows.map((p) => {
       const v = byProductId.get(String(p.id)) ?? [];
-      return toProductResponse(
-        p as any,
-        v as any
-      );
+      return toProductResponse(p as any, v as any);
     });
 
     return c.json({
@@ -132,7 +132,7 @@ products.get('/:id', async (c) => {
         name: schema.products.name,
         description: schema.products.description,
         base_price: schema.products.base_price,
-        printful_product_id: schema.products.printful_product_id,
+        provider_product_id: schema.products.provider_product_id,
       })
       .from(schema.products)
       .where(eq(schema.products.id, id))
@@ -151,15 +151,13 @@ products.get('/:id', async (c) => {
         size: schema.productVariants.size,
         color: schema.productVariants.color,
         price_override: schema.productVariants.price_override,
-        printful_variant_id: schema.productVariants.printful_variant_id,
+        provider_variant_id: schema.productVariants.provider_variant_id,
       })
       .from(schema.productVariants)
       .where(eq(schema.productVariants.product_id, id))
       .orderBy(desc(schema.productVariants.created_at));
 
-    return c.json(
-      toProductResponse(product as any, variantRows as any)
-    );
+    return c.json(toProductResponse(product as any, variantRows as any));
   } catch (error) {
     return c.json({ error: 'Failed to fetch product' }, 500);
   }

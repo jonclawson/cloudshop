@@ -30,15 +30,19 @@ export const passwordResetTokens = sqliteTable('password_reset_tokens', {
   used_at: integer('used_at'),
 });
 
-// Products table
+ // Products table
 export const products = sqliteTable('products', {
   id: text('id').primaryKey().default('uuid()'),
   name: text('name').notNull(),
   sku: text('sku').notNull().unique(),
   description: text('description'),
   base_price: real('base_price').notNull(),
-  printful_product_id: text('printful_product_id'),
-  printful_sync_at: integer('printful_sync_at'),
+
+  // External provider info (e.g. Printful)
+  provider: text('provider').notNull(),
+  provider_product_id: text('provider_product_id').notNull(),
+  provider_sync_at: integer('provider_sync_at'),
+
   created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
   updated_at: integer('updated_at').default(sql`CURRENT_TIMESTAMP`),
 });
@@ -50,7 +54,9 @@ export const productVariants = sqliteTable('product_variants', {
   size: text('size'),
   color: text('color'),
   price_override: real('price_override'),
-  printful_variant_id: text('printful_variant_id'),
+
+  provider_variant_id: text('provider_variant_id').notNull(),
+
   created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
 });
 

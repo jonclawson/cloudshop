@@ -74,7 +74,7 @@ export default function ProductPage() {
       currency: 'USD',
       image: '',
       variantId: String(selectedVariant.id),
-      productId: String(product.external_id ?? product.id),
+      productId: String(product.id),
     });
     router('/cart');
   };

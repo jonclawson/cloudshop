@@ -207,8 +207,10 @@ orders.post('/', optionalAuth, async (c) => {
           name: `Synthetic product ${productId}`,
           description: null,
           base_price: productBasePriceDollarsByProductId.get(productId) ?? 0,
-          printful_product_id: null,
-          printful_sync_at: null,
+
+          provider: 'printful',
+          provider_product_id: productId,
+          provider_sync_at: null,
         }))
       );
     }
@@ -232,7 +234,8 @@ orders.post('/', optionalAuth, async (c) => {
           size: null,
           color: null,
           price_override: null,
-          printful_variant_id: null,
+
+          provider_variant_id: variantId,
         }))
       );
     }

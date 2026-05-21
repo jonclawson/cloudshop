@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { desc, eq, inArray } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { getDb, schema } from '../db';
 import { verifyJWT } from '../middleware/auth';
 import { mockPrintful } from '../services/mock';
@@ -40,65 +40,97 @@ admin.post('/sync-products', verifyJWT, async (c) => {
     await assertAdmin(c);
     const result = await mockPrintful.syncProducts();
     const db = getDb(c.env.DB);
-    
+
     const syncedAtMs = result.synced_at;
-    const printfulProducts = result.products;
-    
-    const printfulProductIds = printfulProducts.map((p) => String(p.external_id));
-    const printfulVariantIds = printfulProducts.flatMap((p) => p.variants.map((v) => String(v.external_id)));
-    
-    // Remove existing rows for this Printful sync so IDs stay consistent for joins.
-    if (printfulVariantIds.length > 0) {
-      await db
-      .delete(schema.productVariants)
-      .where(inArray(schema.productVariants.printful_variant_id, printfulVariantIds));
-    }
-    if (printfulProductIds.length > 0) {
-      await db
-      .delete(schema.products)
-      .where(inArray(schema.products.printful_product_id, printfulProductIds));
-    }
-    
-    // Insert products first (so product_id FK constraints pass).
-    const productRows = printfulProducts.map((p) => {
+    const provider = 'printful';
+
+    const providerProducts = result.products;
+
+    // provider_product_id -> internal products.id
+    const providerProductIdToInternalId = new Map<string, string>();
+
+    // Upsert products by provider_product_id (no deletes)
+    for (const p of providerProducts) {
+      const providerProductId = String(p.external_id);
+
+      const existingProduct = await db
+        .select({ id: schema.products.id })
+        .from(schema.products)
+        .where(eq(schema.products.provider_product_id, providerProductId))
+        .limit(1);
+
+      const productInternalId = existingProduct[0]?.id ?? crypto.randomUUID();
+      providerProductIdToInternalId.set(providerProductId, productInternalId);
+
       const variantPrices = p.variants.map((v) => Number(v.price));
       const basePrice = Number.isFinite(Math.min(...variantPrices)) ? Math.min(...variantPrices) : 0;
 
-      return {
-        id: String(p.external_id), // stable ID for cart/order joins
+      const productValues = {
+        id: productInternalId,
         name: p.title,
-        sku: `printful-${String(p.external_id)}`,
+        sku: `printful-${providerProductId}`,
         description: p.description,
         base_price: basePrice,
-        printful_product_id: String(p.external_id),
-        printful_sync_at: syncedAtMs,
+
+        provider,
+        provider_product_id: providerProductId,
+        provider_sync_at: syncedAtMs,
       };
-    });
-    
-    if (productRows.length > 0) {
-      await db.insert(schema.products).values(productRows);
+
+      if (existingProduct.length > 0) {
+        await db.update(schema.products).set(productValues).where(eq(schema.products.id, productInternalId));
+      } else {
+        await db.insert(schema.products).values(productValues);
+      }
     }
 
-    const variantRows = printfulProducts.flatMap((p) =>
-      p.variants.map((v) => ({
-        id: String(v.external_id), // stable ID for cart/order joins
-        product_id: String(p.external_id),
-        size: v.size,
-        color: v.color,
-        price_override: Number(v.price),
-        printful_variant_id: String(v.external_id),
-      }))
-    );
-    
-    if (variantRows.length > 0) {
-      await db.insert(schema.productVariants).values(variantRows);
+    // Upsert variants by provider_variant_id (no deletes)
+    let variantCount = 0;
+
+    for (const p of providerProducts) {
+      const providerProductId = String(p.external_id);
+      const productInternalId = providerProductIdToInternalId.get(providerProductId);
+      if (!productInternalId) continue;
+
+      for (const v of p.variants) {
+        variantCount += 1;
+
+        const providerVariantId = String(v.external_id);
+
+        const existingVariant = await db
+          .select({ id: schema.productVariants.id })
+          .from(schema.productVariants)
+          .where(eq(schema.productVariants.provider_variant_id, providerVariantId))
+          .limit(1);
+
+        const variantInternalId = existingVariant[0]?.id ?? crypto.randomUUID();
+
+        const variantValues = {
+          id: variantInternalId,
+          product_id: productInternalId,
+          size: 'size' in v ? (v.size ?? null) : null,
+          color: 'color' in v ? (v.color ?? null) : null,
+          price_override: Number(v.price),
+
+          provider_variant_id: providerVariantId,
+        };
+
+        if (existingVariant.length > 0) {
+          await db
+            .update(schema.productVariants)
+            .set(variantValues)
+            .where(eq(schema.productVariants.id, variantInternalId));
+        } else {
+          await db.insert(schema.productVariants).values(variantValues);
+        }
+      }
     }
-    
+
     await db.insert(schema.productSyncLog).values({
       id: crypto.randomUUID(),
       synced_at: syncedAtMs,
       product_count: result.count,
-      variant_count: printfulVariantIds.length,
+      variant_count: variantCount,
       error_message: null,
     });
 
@@ -109,7 +141,11 @@ admin.post('/sync-products', verifyJWT, async (c) => {
       products: result.products,
     });
   } catch (error) {
-    if (error instanceof Error && (error.message === 'UNAUTHENTICATED' || error.message === 'FORBIDDEN')) {
+    console.error('Error syncing products:', error);
+    if (
+      error instanceof Error &&
+      (error.message === 'UNAUTHENTICATED' || error.message === 'FORBIDDEN')
+    ) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     return c.json({ error: 'Failed to sync products' }, 500);
@@ -135,7 +171,10 @@ admin.get('/users', verifyJWT, async (c) => {
 
     return c.json({ users });
   } catch (error) {
-    if (error instanceof Error && (error.message === 'UNAUTHENTICATED' || error.message === 'FORBIDDEN')) {
+    if (
+      error instanceof Error &&
+      (error.message === 'UNAUTHENTICATED' || error.message === 'FORBIDDEN')
+    ) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     return c.json({ error: 'Failed to fetch users' }, 500);
@@ -182,7 +221,10 @@ admin.get('/users/:id', verifyJWT, async (c) => {
       orders,
     });
   } catch (error) {
-    if (error instanceof Error && (error.message === 'UNAUTHENTICATED' || error.message === 'FORBIDDEN')) {
+    if (
+      error instanceof Error &&
+      (error.message === 'UNAUTHENTICATED' || error.message === 'FORBIDDEN')
+    ) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     return c.json({ error: 'Failed to fetch user' }, 500);
@@ -211,7 +253,10 @@ admin.get('/orders', verifyJWT, async (c) => {
 
     return c.json({ orders });
   } catch (error) {
-    if (error instanceof Error && (error.message === 'UNAUTHENTICATED' || error.message === 'FORBIDDEN')) {
+    if (
+      error instanceof Error &&
+      (error.message === 'UNAUTHENTICATED' || error.message === 'FORBIDDEN')
+    ) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     return c.json({ error: 'Failed to fetch orders' }, 500);
@@ -284,12 +329,14 @@ admin.get('/orders/:id', verifyJWT, async (c) => {
       })),
     });
   } catch (error) {
-    if (error instanceof Error && (error.message === 'UNAUTHENTICATED' || error.message === 'FORBIDDEN')) {
+    if (
+      error instanceof Error &&
+      (error.message === 'UNAUTHENTICATED' || error.message === 'FORBIDDEN')
+    ) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     return c.json({ error: 'Failed to fetch order' }, 500);
   }
 });
-
 
 export default admin;
