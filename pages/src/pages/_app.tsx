@@ -62,15 +62,15 @@ export default function GlobalLayout() {
             <nav className="flex space-x-4">
               {isAuthenticated ? (
                 <>
-                  <a href="/" className="text-gray-700 hover:text-gray-900">
+                  <Link to="/" className="text-gray-700 hover:text-gray-900">
                     Shop
-                  </a>
-                  <a href="/orders" className="text-gray-700 hover:text-gray-900">
+                  </Link>
+                  <Link to="/orders" className="text-gray-700 hover:text-gray-900">
                     Orders
-                  </a>
-                  <a href="/cart" className="text-gray-700 hover:text-gray-900">
+                  </Link>
+                  <Link to="/cart" className="text-gray-700 hover:text-gray-900">
                     Cart
-                  </a>
+                  </Link>
                   <button
                     type="button"
                     onClick={async () => {
@@ -83,9 +83,9 @@ export default function GlobalLayout() {
                   </button>
                 </>
               ) : (
-                <a href="/login" className="text-gray-700 hover:text-gray-900">
+                <Link to="/login" className="text-gray-700 hover:text-gray-900">
                   Login
-                </a>
+                </Link>
               )}
             </nav>
           </div>

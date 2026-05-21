@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { productsApi } from '../useApi';
+import { Link } from 'react-router-dom';
 
 type Product = {
   id: string;
@@ -41,9 +42,9 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {products.map((product: Product) => (
-              <a
+              <Link
                 key={product.id}
-                href={`/product/${product.id}`}
+                to={`/product/${product.id}`}
                 className="block p-4 border border-gray-200 rounded-lg hover:shadow-lg transition"
               >
                 <h3 className="font-semibold text-gray-900">{product.title}</h3>
@@ -53,7 +54,7 @@ export default function HomePage() {
                     From ${product.variants[0].price}
                   </p>
                 )}
-              </a>
+              </Link>
             ))}
           </div>
         )}
