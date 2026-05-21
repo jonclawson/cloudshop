@@ -1,5 +1,5 @@
 import { useShoppingCart } from 'use-shopping-cart';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -37,9 +37,9 @@ export default function CartPage() {
         {items.length === 0 ? (
           <div className="text-center py-16 border-2 border-dashed border-gray-300 rounded-lg">
             <p className="text-gray-600 mb-4">Your cart is empty</p>
-            <a href="/" className="text-indigo-600 hover:text-indigo-700 font-medium">
+            <Link to="/" className="text-indigo-600 hover:text-indigo-700 font-medium">
               Continue shopping
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="grid gap-6">
