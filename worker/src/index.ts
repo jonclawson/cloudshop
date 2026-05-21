@@ -5,9 +5,9 @@ import productsRoutes from './routes/products';
 import ordersRoutes from './routes/orders';
 import uploadsRoutes from './routes/uploads';
 import adminRoutes from './routes/admin';
-import { initializeSchema } from './db/migrations';
 import { getDb, schema } from './db';
 import { eq } from 'drizzle-orm';
+import { hashPassword } from './services/authUtils';
 
 export type CloudshopEnv = {
   DB: D1Database;
@@ -21,26 +21,14 @@ type Bindings = CloudshopEnv;
 const app = new Hono<{ Bindings }>();
 
 const SEEDED_ADMIN_EMAIL = 'admin@example.com';
+const SEEDED_ADMIN_PASSWORD = 'password123';
 
-// Initialize schema on first request, then verify seeded admin exists.
-// The Playwright admin tests rely on `admin@example.com` / `password123`.
-let schemaInitialized = false;
+// In non-prod, ensure seeded admin exists even if code/DB changed after worker startup.
 let seededAdminVerified = false;
 
 app.use('*', async (c, next) => {
   const environment = c.env.ENVIRONMENT || 'production';
 
-  if (!schemaInitialized) {
-    try {
-      await initializeSchema(c.env.DB, environment);
-      schemaInitialized = true;
-    } catch (error) {
-      console.error('Schema initialization error:', error);
-      schemaInitialized = true; // continue; schema may already exist
-    }
-  }
-
-  // In non-prod, ensure seeded admin exists even if code/DB changed after worker startup.
   if (!seededAdminVerified && environment !== 'production') {
     try {
       const db = getDb(c.env.DB);
@@ -50,16 +38,22 @@ app.use('*', async (c, next) => {
         .where(eq(schema.users.email, SEEDED_ADMIN_EMAIL))
         .limit(1);
 
-      if (adminRows.length > 0) {
-        seededAdminVerified = true;
-      } else {
-        // Retry seeding by re-running initializeSchema (it is idempotent for our use case)
-        await initializeSchema(c.env.DB, environment);
-        seededAdminVerified = true;
+      if (adminRows.length === 0) {
+        const userId = crypto.randomUUID();
+        const passwordHash = await hashPassword(SEEDED_ADMIN_PASSWORD);
+
+        await db.insert(schema.users).values({
+          id: userId,
+          email: SEEDED_ADMIN_EMAIL,
+          password_hash: passwordHash,
+          admin: true,
+        });
       }
+
+      seededAdminVerified = true;
     } catch (error) {
+      // Don't block requests; migrations should already be applied before the worker starts.
       console.error('Seeded admin verification failed (continuing):', error);
-      // Don't block requests; next attempt may succeed.
     }
   }
 

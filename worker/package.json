@@ -6,14 +6,16 @@
   "scripts": {
     "dev": "wrangler dev --env development --ip 0.0.0.0",
     "build": "wrangler deploy --dry-run",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "drizzle:generate": "drizzle-kit generate"
   },
   "dependencies": {
     "hono": "^4.0.0",
-    "drizzle-orm": "^0.28.0",
+    "drizzle-orm": "^0.45.2",
     "jose": "^5.0.0"
   },
   "devDependencies": {
+    "drizzle-kit": "^0.28.1",
     "wrangler": "^3.0.0",
     "@cloudflare/workers-types": "^4.0.0",
     "typescript": "^5.0.0"
