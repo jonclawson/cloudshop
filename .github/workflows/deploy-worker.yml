@@ -36,6 +36,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           ENVIRONMENT: production
           USE_MOCKS: 'false'
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           PRINTFUL_API_KEY: ${{ secrets.PRINTFUL_API_KEY }}
           MAILCHANNELS_API_KEY: ${{ secrets.MAILCHANNELS_API_KEY }}

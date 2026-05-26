@@ -17,6 +17,10 @@ build/
 .env.production
 .env.*.local
 
+# Cloudflare wrangler local dev vars (DO NOT COMMIT)
+.dev.vars
+worker/.dev.vars
+
 # Terraform
 terraform/.terraform/
 terraform/.terraform.lock.hcl

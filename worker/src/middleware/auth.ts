@@ -17,8 +17,12 @@ export const verifyJWT: MiddlewareHandler<{ Variables: { auth: AuthPayload } }> 
   }
 
   const token = authHeader.slice(7);
-  const jwtSecret = (c.env as any).JWT_SECRET || 'dev-secret';
-  const secret = new TextEncoder().encode(jwtSecret);
+
+  const environment = (c.env as any).ENVIRONMENT || 'production';
+  const jwtSecret = (c.env as any).JWT_SECRET;
+
+  const resolvedJwtSecret = jwtSecret || 'dev-secret';
+  const secret = new TextEncoder().encode(resolvedJwtSecret);
 
   try {
     const { payload } = await jwtVerify(token, secret);
@@ -47,8 +51,12 @@ export const optionalAuth: MiddlewareHandler<{ Variables: { auth?: AuthPayload }
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
-    const jwtSecret = (c.env as any).JWT_SECRET || 'dev-secret';
-    const secret = new TextEncoder().encode(jwtSecret);
+
+    const environment = (c.env as any).ENVIRONMENT || 'production';
+    const jwtSecret = (c.env as any).JWT_SECRET;
+
+    const resolvedJwtSecret = jwtSecret || 'dev-secret';
+    const secret = new TextEncoder().encode(resolvedJwtSecret);
 
     try {
       const { payload } = await jwtVerify(token, secret);
