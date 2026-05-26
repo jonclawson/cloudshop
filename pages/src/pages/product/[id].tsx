@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useShoppingCart } from 'use-shopping-cart';
 import { useParams } from 'react-router-dom';
 import { productsApi } from '../../useApi';
@@ -96,7 +97,20 @@ export default function ProductPage() {
 
           <div>
             <h1 className="text-3xl font-bold mb-4">{displayName}</h1>
-            <p className="text-gray-600 mb-4">{product.description}</p>
+            <div className="text-gray-600 mb-4">
+              <ReactMarkdown
+                skipHtml
+                components={{
+                  p: ({ node, ...props }) => <p {...props} className="mb-4 last:mb-0" />,
+                  ul: ({ node, ...props }) => (
+                    <ul {...props} className="list-disc ml-6 mb-4 last:mb-0" />
+                  ),
+                  li: ({ node, ...props }) => <li {...props} className="mt-1" />,
+                }}
+              >
+                {product.description ?? ''}
+              </ReactMarkdown>
+            </div>
 
             {product.variants && product.variants.length > 0 && (
               <div className="mb-6">

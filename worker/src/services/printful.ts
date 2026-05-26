@@ -55,6 +55,20 @@ function normalizeMoneyToDollars(value: unknown): number {
   return value;
 }
 
+function normalizeMarkdownDescription(value: string | undefined): string | null {
+  if (!value) return null;
+
+  // Printful sometimes sends literal "\n" sequences; convert them to real newlines.
+  // Also normalize CRLF -> LF.
+  const withNewlines = value.replace(/•/g, '- ');
+  console.log('Normalized description:', { original: value, withNewlines });
+
+  // Keep as a string (not a persisted file). Trim only outer whitespace.
+  const trimmed = withNewlines.trim();
+
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function normalizePrintfulVariant(variant: UnknownRecord): PrintfulProductVariantResponse {
   const id = asString(variant.id) ?? crypto.randomUUID();
   const externalId = asString(variant.external_id);
@@ -100,7 +114,7 @@ function normalizePrintfulProduct(product: UnknownRecord): PrintfulProductRespon
     external_id: externalId,
     title,
     name,
-    description: asString(product.description) ?? null,
+    description: normalizeMarkdownDescription(asString(product.description)),
     variants,
   };
 }
