@@ -48,7 +48,12 @@ export default function HomePage() {
                 className="block p-4 border border-gray-200 rounded-lg hover:shadow-lg transition"
               >
                 <h3 className="font-semibold text-gray-900">{product.title}</h3>
-                <p className="text-sm text-gray-600">{product.description}</p>
+                <p
+                  className="text-sm text-gray-600 line-clamp-3"
+                  title={product.description ?? ''}
+                >
+                  {product.description}
+                </p>
                 {product.variants && product.variants.length > 0 && (
                   <p className="text-sm text-gray-500 mt-2">
                     From ${product.variants[0].price}
