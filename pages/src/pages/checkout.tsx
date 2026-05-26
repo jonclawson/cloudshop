@@ -156,7 +156,7 @@ export default function CheckoutPage() {
                       JSON.stringify({ id: data.user.id, email: data.user.email ?? '' })
                     );
 
-                    setUser({ id: data.user.id, email: data.user.email ?? '' });
+                    setUser({ id: data.user.id, email: data.user.email ?? '', admin: false });
                   }
 
                   clearCart();
