@@ -18,7 +18,7 @@ id = "cloudshop-kv"
 
 # Environment-specific configurations
 [env.development]
-vars = { ENVIRONMENT = "development", USE_MOCKS = "true", JWT_SECRET = "dev-secret-change-in-production" }
+vars = { ENVIRONMENT = "development", USE_MOCKS = "false", PRINTFUL_API_KEY = "Mom86HuU7zE8pkXtVhUnoNR2Iffi9WXQMLT4crXE", JWT_SECRET = "dev-secret-change-in-production" }
 d1_databases = [{ binding = "DB", database_name = "cloudshop", database_id = "local-db" }]
 r2_buckets = [{ binding = "R2", bucket_name = "cloudshop-uploads" }]
 kv_namespaces = [{ binding = "KV", id = "cloudshop-kv" }]

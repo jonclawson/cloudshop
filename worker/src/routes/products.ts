@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { getDb, schema } from '../db';
+import { getPrintfulProductById, getPrintfulProducts, type PrintfulProductResponse } from '../services/printful';
 
 type Bindings = {
   DB: D1Database;
+  PRINTFUL_API_KEY?: string;
 };
 
 const products = new Hono<{ Bindings }>();
@@ -59,10 +61,31 @@ function toProductResponse(
   };
 }
 
+function productProviderKey(product: { external_id?: string; id: string }): string {
+  return product.external_id ?? product.id;
+}
+
+function mergeDbAndPrintfulProducts(
+  dbProducts: ProductResponse[],
+  dbProviderProductIds: Set<string>,
+  printfulProducts: PrintfulProductResponse[]
+): ProductResponse[] {
+  const merged: ProductResponse[] = [...dbProducts];
+
+  for (const p of printfulProducts) {
+    const providerKey = productProviderKey(p);
+    if (dbProviderProductIds.has(providerKey)) continue;
+    merged.push(p as unknown as ProductResponse);
+  }
+
+  return merged;
+}
+
 products.get('/', async (c) => {
   try {
     const db = getDb(c.env.DB);
 
+    // --- DB products ---
     const productRows = await db
       .select({
         id: schema.products.id,
@@ -75,44 +98,56 @@ products.get('/', async (c) => {
       .orderBy(desc(schema.products.created_at))
       .limit(200);
 
-    if (productRows.length === 0) {
-      return c.json({
-        products: [],
-        count: 0,
-        synced_at: null,
-      });
+    const dbProducts: ProductResponse[] = [];
+
+    if (productRows.length > 0) {
+      const productIds = productRows.map((p) => p.id);
+
+      const variantRows = await db
+        .select({
+          id: schema.productVariants.id,
+          product_id: schema.productVariants.product_id,
+          size: schema.productVariants.size,
+          color: schema.productVariants.color,
+          price_override: schema.productVariants.price_override,
+          provider_variant_id: schema.productVariants.provider_variant_id,
+        })
+        .from(schema.productVariants)
+        .where(inArray(schema.productVariants.product_id, productIds));
+
+      const byProductId = new Map<string, typeof variantRows>();
+      for (const row of variantRows) {
+        const key = String(row.product_id);
+        const list = byProductId.get(key) ?? [];
+        list.push(row);
+        byProductId.set(key, list);
+      }
+
+      for (const p of productRows) {
+        const v = byProductId.get(String(p.id)) ?? [];
+        dbProducts.push(toProductResponse(p as any, v as any));
+      }
     }
 
-    const productIds = productRows.map((p) => p.id);
+    const dbProviderProductIds = new Set(productRows.map((p) => String(p.provider_product_id)));
 
-    const variantRows = await db
-      .select({
-        id: schema.productVariants.id,
-        product_id: schema.productVariants.product_id,
-        size: schema.productVariants.size,
-        color: schema.productVariants.color,
-        price_override: schema.productVariants.price_override,
-        provider_variant_id: schema.productVariants.provider_variant_id,
-      })
-      .from(schema.productVariants)
-      .where(inArray(schema.productVariants.product_id, productIds));
-
-    const byProductId = new Map<string, typeof variantRows>();
-    for (const row of variantRows) {
-      const key = String(row.product_id);
-      const list = byProductId.get(key) ?? [];
-      list.push(row);
-      byProductId.set(key, list);
+    // --- Printful products (live, no DB writes) ---
+    let printfulProducts: PrintfulProductResponse[] = [];
+    try {
+      const fetched = await getPrintfulProducts(c, { maxProducts: 200 });
+      console.log(`Fetched ${fetched.length} products from Printful`);  
+      printfulProducts = fetched;
+    } catch (err) {
+      // If Printful fails (missing key, network, etc.), keep DB behavior.
+      console.error('Failed to fetch Printful products:', err);
+      printfulProducts = [];
     }
 
-    const responseProducts = productRows.map((p) => {
-      const v = byProductId.get(String(p.id)) ?? [];
-      return toProductResponse(p as any, v as any);
-    });
+    const merged = mergeDbAndPrintfulProducts(dbProducts, dbProviderProductIds, printfulProducts);
 
     return c.json({
-      products: responseProducts,
-      count: responseProducts.length,
+      products: merged,
+      count: merged.length,
       synced_at: null,
     });
   } catch (error) {
@@ -138,26 +173,36 @@ products.get('/:id', async (c) => {
       .where(eq(schema.products.id, id))
       .limit(1);
 
-    if (productRow.length === 0) {
-      return c.json({ error: 'Product not found' }, 404);
+    if (productRow.length > 0) {
+      const product = productRow[0];
+
+      const variantRows = await db
+        .select({
+          id: schema.productVariants.id,
+          product_id: schema.productVariants.product_id,
+          size: schema.productVariants.size,
+          color: schema.productVariants.color,
+          price_override: schema.productVariants.price_override,
+          provider_variant_id: schema.productVariants.provider_variant_id,
+        })
+        .from(schema.productVariants)
+        .where(eq(schema.productVariants.product_id, id))
+        .orderBy(desc(schema.productVariants.created_at));
+
+      return c.json(toProductResponse(product as any, variantRows as any));
     }
 
-    const product = productRow[0];
-
-    const variantRows = await db
-      .select({
-        id: schema.productVariants.id,
-        product_id: schema.productVariants.product_id,
-        size: schema.productVariants.size,
-        color: schema.productVariants.color,
-        price_override: schema.productVariants.price_override,
-        provider_variant_id: schema.productVariants.provider_variant_id,
-      })
-      .from(schema.productVariants)
-      .where(eq(schema.productVariants.product_id, id))
-      .orderBy(desc(schema.productVariants.created_at));
-
-    return c.json(toProductResponse(product as any, variantRows as any));
+    // DB didn't know this id: try Printful live.
+    try {
+      const printful = await getPrintfulProductById(c, id);
+      if (!printful) {
+        return c.json({ error: 'Product not found' }, 404);
+      }
+      return c.json(printful as unknown as ProductResponse);
+    } catch (err) {
+      console.error('Failed to fetch Printful product by id:', err);
+      return c.json({ error: 'Product not found' }, 404);
+    }
   } catch (error) {
     return c.json({ error: 'Failed to fetch product' }, 500);
   }

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { SignJWT, jwtVerify } from 'jose';
 import { getDb } from '../db';
 import { users, refreshTokens, passwordResetTokens } from '../schema';
-import { eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { getMailchannelsService } from '../services/mock';
 import { verifyJWT } from '../middleware/auth';
 
@@ -397,9 +397,13 @@ auth.post('/reset-password', async (c) => {
     const tokenRow = await db
       .select()
       .from(passwordResetTokens)
-      .where(eq(passwordResetTokens.token_hash, tokenHash))
-      .where(gt(passwordResetTokens.expires_at, nowSeconds))
-      .where(isNull(passwordResetTokens.used_at))
+      .where(
+        and(
+          eq(passwordResetTokens.token_hash, tokenHash),
+          gt(passwordResetTokens.expires_at, nowSeconds),
+          isNull(passwordResetTokens.used_at)
+        )
+      )
       .limit(1);
 
     if (tokenRow.length === 0) {
