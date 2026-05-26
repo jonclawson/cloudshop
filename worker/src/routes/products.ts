@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { desc, eq, inArray } from 'drizzle-orm';
+import { desc, eq, inArray, or } from 'drizzle-orm';
 import { getDb, schema } from '../db';
 import { getPrintfulProductById, getPrintfulProducts, type PrintfulProductResponse } from '../services/printful';
 
@@ -170,7 +170,7 @@ products.get('/:id', async (c) => {
         provider_product_id: schema.products.provider_product_id,
       })
       .from(schema.products)
-      .where(eq(schema.products.id, id))
+      .where(or(eq(schema.products.id, id), eq(schema.products.provider_product_id, id)))
       .limit(1);
 
     if (productRow.length > 0) {
@@ -186,7 +186,7 @@ products.get('/:id', async (c) => {
           provider_variant_id: schema.productVariants.provider_variant_id,
         })
         .from(schema.productVariants)
-        .where(eq(schema.productVariants.product_id, id))
+        .where(eq(schema.productVariants.product_id, product.id))
         .orderBy(desc(schema.productVariants.created_at));
 
       return c.json(toProductResponse(product as any, variantRows as any));

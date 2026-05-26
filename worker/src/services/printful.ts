@@ -81,6 +81,8 @@ function normalizePrintfulProduct(product: UnknownRecord): PrintfulProductRespon
   const externalId = asString(product.external_id);
   const printfulId = asString(product.id) ?? crypto.randomUUID();
 
+  // Use external_id as the stable storefront identifier when available.
+  // This allows /api/products/:id to resolve without DB writes.
   const storefrontProductId = externalId ?? printfulId;
 
   const variantsRaw = product.variants;
@@ -115,6 +117,12 @@ function normalizeMockProducts(mockProducts: unknown[]): PrintfulProductResponse
 
 let cachedProducts: PrintfulProductResponse[] | null = null;
 let cacheExpiresAtMs = 0;
+let cachedProductsSource: 'mocks' | 'printful' | null = null;
+
+function getProductsSource(c: { env: PrintfulEnv }): 'mocks' | 'printful' {
+  const useMocks = shouldUseMocks(c.env) || !c.env.PRINTFUL_API_KEY;
+  return useMocks ? 'mocks' : 'printful';
+}
 
 async function fetchPrintfulProductsPage(env: PrintfulEnv, limit: number, offset: number): Promise<PrintfulListResponse> {
   const apiKey = env.PRINTFUL_API_KEY;
@@ -142,6 +150,43 @@ async function fetchPrintfulProductsPage(env: PrintfulEnv, limit: number, offset
   return (await response.json()) as PrintfulListResponse;
 }
 
+async function fetchPrintfulProductById(env: PrintfulEnv, id: string): Promise<PrintfulProductResponse> {
+  const apiKey = env.PRINTFUL_API_KEY;
+  if (!apiKey) {
+    throw new Error('MISSING_PRINTFUL_API_KEY');
+  }
+
+  const url = new URL(`https://api.printful.com/products/${encodeURIComponent(id)}`);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (response.status === 404) {
+    throw new Error('PRINTFUL_PRODUCT_NOT_FOUND');
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`PRINTFUL_PRODUCT_FAILED:${response.status}:${text.slice(0, 200)}`);
+  }
+
+  const data = (await response.json()) as { result?: unknown };
+
+  // Printful typically wraps in { result: ... }. If not, fall back to the full body.
+  const rawProduct = (data as any).result ?? data;
+  if (!rawProduct || typeof rawProduct !== 'object') {
+    throw new Error('PRINTFUL_PRODUCT_INVALID_PAYLOAD');
+  }
+  console.log(`Fetched product ${id} from Printful`, rawProduct);
+
+  return normalizePrintfulProduct(rawProduct.product as UnknownRecord);
+}
+
 async function getMockProducts(env: PrintfulEnv): Promise<PrintfulProductResponse[]> {
   if (!shouldUseMocks(env)) {
     throw new Error('PRINTFUL_MOCKS_DISABLED');
@@ -159,21 +204,29 @@ export async function getPrintfulProducts(
   const maxProducts = options?.maxProducts ?? 200;
   const cacheTtlMs = options?.cacheTtlMs ?? 5 * 60 * 1000; // 5 minutes
 
+  const productsSource = getProductsSource(c);
+
   const nowMs = Date.now();
-  if (cachedProducts && nowMs < cacheExpiresAtMs) {
+  if (
+    cachedProducts &&
+    cachedProductsSource === productsSource &&
+    nowMs < cacheExpiresAtMs
+  ) {
     return cachedProducts.slice(0, maxProducts);
   }
 
   // In local/dev, prefer mocks (or if PRINTFUL_API_KEY isn't present).
-  if (shouldUseMocks(c.env) || !c.env.PRINTFUL_API_KEY) {
+  if (productsSource === 'mocks') {
     try {
       const mockProducts = await getMockProducts(c.env);
       cachedProducts = mockProducts;
+      cachedProductsSource = 'mocks';
       cacheExpiresAtMs = Date.now() + cacheTtlMs;
       return cachedProducts.slice(0, maxProducts);
     } catch {
       // If mocks are disabled/missing, fall back to empty (route catches and keeps DB-only).
       cachedProducts = [];
+      cachedProductsSource = 'mocks';
       cacheExpiresAtMs = Date.now() + cacheTtlMs;
       return [];
     }
@@ -209,12 +262,32 @@ export async function getPrintfulProducts(
   }
 
   cachedProducts = all;
+  cachedProductsSource = 'printful';
   cacheExpiresAtMs = Date.now() + cacheTtlMs;
 
   return cachedProducts.slice(0, maxProducts);
 }
 
 export async function getPrintfulProductById(c: { env: PrintfulEnv }, id: string) {
-  const products = await getPrintfulProducts(c, { maxProducts: 500 });
-  return products.find((p) => p.id === id) ?? null;
+  // Prefer the dedicated endpoint first to avoid O(n) list fetches.
+  // If it doesn't work (e.g. id is external_id and the endpoint expects internal id),
+  // fall back to list-search using the normalized id mapping.
+  if (shouldUseMocks(c.env) || !c.env.PRINTFUL_API_KEY) {
+    const products = await getPrintfulProducts(c, { maxProducts: 500 });
+    return products.find((p) => p.id === id || p.external_id === id) ?? null;
+  }
+
+  try {
+    return await fetchPrintfulProductById(c.env, id);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === 'PRINTFUL_PRODUCT_NOT_FOUND') {
+      const products = await getPrintfulProducts(c, { maxProducts: 500 });
+      return products.find((p) => p.id === id || p.external_id === id) ?? null;
+    }
+
+    // For other errors, keep the previous behavior as a safety net.
+    const products = await getPrintfulProducts(c, { maxProducts: 500 });
+    return products.find((p) => p.id === id || p.external_id === id) ?? null;
+  }
 }
