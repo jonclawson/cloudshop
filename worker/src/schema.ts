@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // Users table
 export const users = sqliteTable('users', {
@@ -111,4 +111,24 @@ export const productSyncLog = sqliteTable('product_sync_log', {
   product_count: integer('product_count'),
   variant_count: integer('variant_count'),
   error_message: text('error_message'),
+});
+
+export const files = sqliteTable('files', {
+  id: text('id').primaryKey().default('uuid()'), // hashed id from url/parent
+  parent: text('parent').notNull(), // 'product' | 'variant' | 'order'
+  parent_id: text('parent_id').notNull(),
+
+  url: text('url').notNull(),
+  filename: text('filename').notNull(),
+  meta: text('meta'),
+
+  created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
+}, (table) => {
+  return [
+    // Standard composite index
+    index('files_parent_parent_id_index').on(table.parent, table.parent_id),
+    
+    // Unique composite index
+    uniqueIndex('files_parent_parent_id_url_unique').on(table.parent, table.parent_id, table.url),
+  ];
 });
