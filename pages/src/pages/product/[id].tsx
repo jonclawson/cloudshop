@@ -30,6 +30,7 @@ export default function ProductPage() {
   const { addItem } = useShoppingCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [mainImageSrc, setMainImageSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -58,6 +59,10 @@ export default function ProductPage() {
     const merged = [...productImages, ...variantImages].filter(Boolean);
     return merged;
   }, [product?.images, selectedVariant?.images]);
+
+  useEffect(() => {
+    setMainImageSrc(allImages[0] ?? null);
+  }, [allImages]);
   const priceLabel = useMemo(() => {
     const price = selectedVariant?.price ?? 0;
     return new Intl.NumberFormat('en-US', {
@@ -99,16 +104,45 @@ export default function ProductPage() {
   return (
     <div className="main-class">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-gray-100 rounded-lg h-96 overflow-hidden">
-            {allImages.length > 0 ? (
-              <img
-                src={allImages[0]}
-                alt={displayName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center">
-                <span className="text-gray-500 text-center px-4">{displayName}</span>
+          <div>
+            <div className="bg-gray-100 rounded-lg h-96 overflow-hidden">
+              {mainImageSrc ? (
+                <img
+                  src={mainImageSrc}
+                  alt={displayName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center">
+                  <span className="text-gray-500 text-center px-4">{displayName}</span>
+                </div>
+              )}
+            </div>
+
+            {allImages.length > 0 && (
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                {allImages.map((src) => {
+                  const isSelected = src === mainImageSrc;
+                  return (
+                    <button
+                      key={src}
+                      type="button"
+                      onClick={() => setMainImageSrc(src)}
+                      className={[
+                        'shrink-0 rounded-md border overflow-hidden',
+                        isSelected ? 'border-black' : 'border-transparent',
+                      ].join(' ')}
+                      aria-label={`Show image for ${displayName}`}
+                    >
+                      <img
+                        src={src}
+                        alt={displayName}
+                        loading="lazy"
+                        className="h-16 w-16 object-cover cursor-pointer"
+                      />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
