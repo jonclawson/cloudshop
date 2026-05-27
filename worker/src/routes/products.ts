@@ -17,6 +17,7 @@ type ProductVariantResponse = {
   size?: string | null;
   color?: string | null;
   price: number; // dollars
+  images?: string[];
 };
 
 type ProductResponse = {
@@ -27,6 +28,9 @@ type ProductResponse = {
   description?: string | null;
   variants: ProductVariantResponse[];
   image?: string; // list endpoint: one image
+
+  // detail endpoint: multiple images
+  images?: string[];
 };
 
 function formatVariantTitle(size: string | null | undefined, color: string | null | undefined): string {
@@ -37,10 +41,15 @@ function formatVariantTitle(size: string | null | undefined, color: string | nul
 
 function toProductResponse(
   productRow: typeof schema.products.$inferSelect,
-  variantRows: typeof schema.productVariants.$inferSelect[]
+  variantRows: typeof schema.productVariants.$inferSelect[],
+  productImages?: string[],
+  variantImagesById?: Map<string, string[]>
 ): ProductResponse {
   const variants: ProductVariantResponse[] = variantRows.map((v) => {
     const priceDollars = v.price_override ?? productRow.base_price;
+
+    const images =
+      variantImagesById ? variantImagesById.get(String(v.id)) ?? [] : undefined;
 
     return {
       id: String(v.id),
@@ -49,6 +58,7 @@ function toProductResponse(
       size: v.size,
       color: v.color,
       price: priceDollars,
+      images,
     };
   });
 
@@ -59,6 +69,7 @@ function toProductResponse(
     name: productRow.name,
     description: productRow.description,
     variants,
+    images: productImages,
   };
 }
 
@@ -216,7 +227,55 @@ products.get('/:id', async (c) => {
         .where(eq(schema.productVariants.product_id, product.id))
         .orderBy(desc(schema.productVariants.created_at));
 
-      return c.json(toProductResponse(product as any, variantRows as any));
+      const productImagesRows = await db
+        .select({
+          url: schema.files.url,
+        })
+        .from(schema.files)
+        .where(
+          and(
+            eq(schema.files.parent, 'product'),
+            eq(schema.files.parent_id, product.id)
+          )
+        )
+        .orderBy(asc(schema.files.created_at));
+
+      const productImages = productImagesRows.map((r) => String(r.url));
+
+      const variantIds = variantRows.map((v) => v.id);
+      const variantImagesById = new Map<string, string[]>();
+
+      if (variantIds.length > 0) {
+        const variantFiles = await db
+          .select({
+            parent_id: schema.files.parent_id,
+            url: schema.files.url,
+          })
+          .from(schema.files)
+          .where(
+            and(
+              eq(schema.files.parent, 'variant'),
+              inArray(schema.files.parent_id, variantIds as string[])
+            )
+          )
+          .orderBy(asc(schema.files.created_at));
+
+        for (const row of variantFiles) {
+          const vid = String(row.parent_id);
+          const list = variantImagesById.get(vid) ?? [];
+          list.push(String(row.url));
+          variantImagesById.set(vid, list);
+        }
+      }
+
+      return c.json(
+        toProductResponse(
+          product as any,
+          variantRows as any,
+          productImages,
+          variantImagesById
+        )
+      );
     }
 
     // DB didn't know this id: try Printful live.
