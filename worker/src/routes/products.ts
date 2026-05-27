@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { desc, eq, inArray, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { getDb, schema } from '../db';
 import { getPrintfulProductById, getPrintfulProducts, type PrintfulProductResponse } from '../services/printful';
 
@@ -26,6 +26,7 @@ type ProductResponse = {
   name?: string;
   description?: string | null;
   variants: ProductVariantResponse[];
+  image?: string; // list endpoint: one image
 };
 
 function formatVariantTitle(size: string | null | undefined, color: string | null | undefined): string {
@@ -115,6 +116,29 @@ products.get('/', async (c) => {
         .from(schema.productVariants)
         .where(inArray(schema.productVariants.product_id, productIds));
 
+      // --- Attach list image (first product file image) ---
+      const productFiles = await db
+        .select({
+          parent_id: schema.files.parent_id,
+          url: schema.files.url,
+        })
+        .from(schema.files)
+        .where(
+          and(
+            eq(schema.files.parent, 'product'),
+            inArray(schema.files.parent_id, productIds as string[])
+          )
+        )
+        .orderBy(asc(schema.files.created_at));
+
+      const firstImageByProductId = new Map<string, string>();
+      for (const row of productFiles) {
+        const pid = String(row.parent_id);
+        if (!firstImageByProductId.has(pid)) {
+          firstImageByProductId.set(pid, String(row.url));
+        }
+      }
+
       const byProductId = new Map<string, typeof variantRows>();
       for (const row of variantRows) {
         const key = String(row.product_id);
@@ -125,7 +149,10 @@ products.get('/', async (c) => {
 
       for (const p of productRows) {
         const v = byProductId.get(String(p.id)) ?? [];
-        dbProducts.push(toProductResponse(p as any, v as any));
+        dbProducts.push({
+          ...toProductResponse(p as any, v as any),
+          image: firstImageByProductId.get(String(p.id)),
+        });
       }
     }
 
