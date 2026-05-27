@@ -49,6 +49,10 @@ export const mockPrintful = {
         external_id: 'tshirt-1',
         title: 'T-Shirt',
         description: 'Premium cotton t-shirt',
+        images: [
+          'https://placehold.co/800x600?text=tshirt-1',
+          'https://placehold.co/800x600?text=tshirt-1+alt',
+        ],
         variants: [
           {
             id: 1,
@@ -57,6 +61,9 @@ export const mockPrintful = {
             size: 'S',
             color: 'White',
             price: 14.99,
+            images: [
+              'https://placehold.co/800x600?text=tshirt-1-s+white',
+            ],
           },
           {
             id: 2,
@@ -65,6 +72,9 @@ export const mockPrintful = {
             size: 'M',
             color: 'White',
             price: 14.99,
+            images: [
+              'https://placehold.co/800x600?text=tshirt-1-m+white',
+            ],
           },
           {
             id: 3,
@@ -73,6 +83,9 @@ export const mockPrintful = {
             size: 'L',
             color: 'White',
             price: 14.99,
+            images: [
+              'https://placehold.co/800x600?text=tshirt-1-l+white',
+            ],
           },
           {
             id: 4,
@@ -81,6 +94,9 @@ export const mockPrintful = {
             size: 'S',
             color: 'Black',
             price: 14.99,
+            images: [
+              'https://placehold.co/800x600?text=tshirt-1-s+black',
+            ],
           },
         ],
       },
@@ -89,6 +105,10 @@ export const mockPrintful = {
         external_id: 'hoodie-1',
         title: 'Hoodie',
         description: 'Cozy zip-up hoodie',
+        images: [
+          'https://placehold.co/800x600?text=hoodie-1',
+          'https://placehold.co/800x600?text=hoodie-1+alt',
+        ],
         variants: [
           {
             id: 5,
@@ -97,6 +117,9 @@ export const mockPrintful = {
             size: 'S',
             color: 'White',
             price: 34.99,
+            images: [
+              'https://placehold.co/800x600?text=hoodie-1-s+white',
+            ],
           },
           {
             id: 6,
@@ -105,6 +128,9 @@ export const mockPrintful = {
             size: 'M',
             color: 'White',
             price: 34.99,
+            images: [
+              'https://placehold.co/800x600?text=hoodie-1-m+white',
+            ],
           },
         ],
       },
@@ -113,6 +139,10 @@ export const mockPrintful = {
         external_id: 'mug-1',
         title: 'Coffee Mug',
         description: '11oz ceramic mug',
+        images: [
+          'https://placehold.co/800x600?text=mug-1',
+          'https://placehold.co/800x600?text=mug-1+alt',
+        ],
         variants: [
           {
             id: 7,
@@ -120,6 +150,9 @@ export const mockPrintful = {
             title: 'White',
             color: 'White',
             price: 9.99,
+            images: [
+              'https://placehold.co/800x600?text=mug-1+white',
+            ],
           },
         ],
       },
@@ -128,6 +161,10 @@ export const mockPrintful = {
         external_id: 'hat-1',
         title: 'Baseball Cap',
         description: 'Adjustable cap',
+        images: [
+          'https://placehold.co/800x600?text=hat-1',
+          'https://placehold.co/800x600?text=hat-1+alt',
+        ],
         variants: [
           {
             id: 8,
@@ -135,6 +172,9 @@ export const mockPrintful = {
             title: 'Black',
             color: 'Black',
             price: 16.99,
+            images: [
+              'https://placehold.co/800x600?text=hat-1+black',
+            ],
           },
           {
             id: 9,
@@ -142,6 +182,9 @@ export const mockPrintful = {
             title: 'White',
             color: 'White',
             price: 16.99,
+            images: [
+              'https://placehold.co/800x600?text=hat-1+white',
+            ],
           },
         ],
       },

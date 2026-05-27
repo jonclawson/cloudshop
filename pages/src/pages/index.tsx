@@ -7,6 +7,7 @@ type Product = {
   title?: string;
   description?: string;
   variants?: Array<{ price?: number }>;
+  image?: string;
 };
 
 export default function HomePage() {
@@ -47,6 +48,14 @@ export default function HomePage() {
                 to={`/product/${product.id}`}
                 className="block p-4 border border-gray-200 rounded-lg hover:shadow-lg transition"
               >
+                {product.image ? (
+                  <img
+                    src={product.image}
+                    alt={product.title ?? 'Product image'}
+                    className="w-full h-32 object-cover rounded-md mb-3 border border-gray-200"
+                    loading="lazy"
+                  />
+                ) : null}
                 <h3 className="font-semibold text-gray-900">{product.title}</h3>
                 <p
                   className="text-sm text-gray-600 line-clamp-3"

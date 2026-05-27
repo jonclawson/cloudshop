@@ -11,6 +11,7 @@ type ProductVariant = {
   size?: string;
   color?: string;
   price: number;
+  images?: string[];
 };
 
 type Product = {
@@ -20,6 +21,7 @@ type Product = {
   name?: string;
   description?: string;
   variants?: ProductVariant[];
+  images?: string[]; // product images
 };
 
 export default function ProductPage() {
@@ -50,6 +52,12 @@ export default function ProductPage() {
   }, [id]);
 
   const displayName = product?.title || product?.name || 'Product';
+  const allImages = useMemo(() => {
+    const productImages = product?.images ?? [];
+    const variantImages = selectedVariant?.images ?? [];
+    const merged = [...productImages, ...variantImages].filter(Boolean);
+    return merged;
+  }, [product?.images, selectedVariant?.images]);
   const priceLabel = useMemo(() => {
     const price = selectedVariant?.price ?? 0;
     return new Intl.NumberFormat('en-US', {
@@ -91,8 +99,18 @@ export default function ProductPage() {
   return (
     <div className="main-class">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
-            <span className="text-gray-500 text-center px-4">{displayName}</span>
+          <div className="bg-gray-100 rounded-lg h-96 overflow-hidden">
+            {allImages.length > 0 ? (
+              <img
+                src={allImages[0]}
+                alt={displayName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center">
+                <span className="text-gray-500 text-center px-4">{displayName}</span>
+              </div>
+            )}
           </div>
 
           <div>
