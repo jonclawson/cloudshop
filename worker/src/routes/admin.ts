@@ -43,29 +43,37 @@ admin.post('/sync-products', verifyJWT, async (c) => {
 
     const syncedAtMs = result.synced_at;
     const provider = 'printful';
-
     const providerProducts = result.products;
 
-    // provider_product_id -> internal products.id
-    const providerProductIdToInternalId = new Map<string, string>();
+    function filenameFromUrl(url: string): string {
+      try {
+        const u = new URL(url);
+        const last = u.pathname.split('/').filter(Boolean).pop();
+        return last || 'file';
+      } catch {
+        return 'file';
+      }
+    }
 
-    // Upsert products by provider_product_id (no deletes)
+    // Drop + recreate (simple sync)
+    await db.delete(schema.files);
+    await db.delete(schema.productVariants);
+    await db.delete(schema.products);
+
+    let variantCount = 0;
+
     for (const p of providerProducts) {
       const providerProductId = String(p.external_id);
 
-      const existingProduct = await db
-        .select({ id: schema.products.id })
-        .from(schema.products)
-        .where(eq(schema.products.provider_product_id, providerProductId))
-        .limit(1);
-
-      const productInternalId = existingProduct[0]?.id ?? crypto.randomUUID();
-      providerProductIdToInternalId.set(providerProductId, productInternalId);
+      const productInternalId = crypto.randomUUID();
 
       const variantPrices = p.variants.map((v) => Number(v.price));
-      const basePrice = Number.isFinite(Math.min(...variantPrices)) ? Math.min(...variantPrices) : 0;
+      const basePrice =
+        variantPrices.length > 0 && Number.isFinite(Math.min(...variantPrices))
+          ? Math.min(...variantPrices)
+          : 0;
 
-      const productValues = {
+      await db.insert(schema.products).values({
         id: productInternalId,
         name: p.title,
         sku: `printful-${providerProductId}`,
@@ -75,37 +83,31 @@ admin.post('/sync-products', verifyJWT, async (c) => {
         provider,
         provider_product_id: providerProductId,
         provider_sync_at: syncedAtMs,
-      };
+      });
 
-      if (existingProduct.length > 0) {
-        await db.update(schema.products).set(productValues).where(eq(schema.products.id, productInternalId));
-      } else {
-        await db.insert(schema.products).values(productValues);
+      // Insert product files from mock images[]
+      if (Array.isArray(p.images)) {
+        for (const url of p.images) {
+          if (typeof url !== 'string') continue;
+          await db.insert(schema.files).values({
+            id: crypto.randomUUID(),
+            parent: 'product',
+            parent_id: productInternalId,
+            url,
+            filename: filenameFromUrl(url),
+            meta: '{}',
+          });
+        }
       }
-    }
 
-    // Upsert variants by provider_variant_id (no deletes)
-    let variantCount = 0;
-
-    for (const p of providerProducts) {
-      const providerProductId = String(p.external_id);
-      const productInternalId = providerProductIdToInternalId.get(providerProductId);
-      if (!productInternalId) continue;
-
+      // Insert variants + variant files from mock images[]
       for (const v of p.variants) {
         variantCount += 1;
 
         const providerVariantId = String(v.external_id);
+        const variantInternalId = crypto.randomUUID();
 
-        const existingVariant = await db
-          .select({ id: schema.productVariants.id })
-          .from(schema.productVariants)
-          .where(eq(schema.productVariants.provider_variant_id, providerVariantId))
-          .limit(1);
-
-        const variantInternalId = existingVariant[0]?.id ?? crypto.randomUUID();
-
-        const variantValues = {
+        await db.insert(schema.productVariants).values({
           id: variantInternalId,
           product_id: productInternalId,
           size: 'size' in v ? (v.size ?? null) : null,
@@ -113,15 +115,20 @@ admin.post('/sync-products', verifyJWT, async (c) => {
           price_override: Number(v.price),
 
           provider_variant_id: providerVariantId,
-        };
+        });
 
-        if (existingVariant.length > 0) {
-          await db
-            .update(schema.productVariants)
-            .set(variantValues)
-            .where(eq(schema.productVariants.id, variantInternalId));
-        } else {
-          await db.insert(schema.productVariants).values(variantValues);
+        if (Array.isArray(v.images)) {
+          for (const url of v.images) {
+            if (typeof url !== 'string') continue;
+            await db.insert(schema.files).values({
+              id: crypto.randomUUID(),
+              parent: 'variant',
+              parent_id: variantInternalId,
+              url,
+              filename: filenameFromUrl(url),
+              meta: '{}',
+            });
+          }
         }
       }
     }
