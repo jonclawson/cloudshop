@@ -21,6 +21,9 @@ export type PrintfulProductResponse = {
   name?: string;
   description?: string | null;
   variants: PrintfulProductVariantResponse[];
+
+  // Used by the UI product list page (GET /api/products)
+  image?: string;
 };
 
 type PrintfulListResponse = {
@@ -103,11 +106,21 @@ function normalizePrintfulProduct(product: UnknownRecord): PrintfulProductRespon
   const variantsList = Array.isArray(variantsRaw) ? variantsRaw : [];
 
   const variants: PrintfulProductVariantResponse[] = variantsList
-    .map((v) => (typeof v === 'object' && v !== null ? normalizePrintfulVariant(v as UnknownRecord) : null))
+    .map((v) =>
+      typeof v === 'object' && v !== null ? normalizePrintfulVariant(v as UnknownRecord) : null
+    )
     .filter((v): v is PrintfulProductVariantResponse => Boolean(v));
 
   const name = asString(product.name);
   const title = asString(product.title) ?? name;
+
+  // Printful payload: `image`
+  const imageFromPayload = asString(product.image);
+
+  // Mock fallback: `images: string[]`
+  const imagesRaw = product.images;
+  const firstMockImage =
+    Array.isArray(imagesRaw) ? imagesRaw.map((x) => (typeof x === 'string' ? x : '')).find(Boolean) : undefined;
 
   return {
     id: storefrontProductId,
@@ -116,6 +129,7 @@ function normalizePrintfulProduct(product: UnknownRecord): PrintfulProductRespon
     name,
     description: normalizeMarkdownDescription(asString(product.description)),
     variants,
+    image: imageFromPayload ?? firstMockImage,
   };
 }
 
