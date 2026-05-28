@@ -12,6 +12,7 @@ export type Path =
   | `/admin/users`
   | `/admin/users/:id`
   | `/cart`
+  | `/category/:id`
   | `/checkout`
   | `/forgot-password`
   | `/login`
@@ -23,6 +24,7 @@ export type Path =
 export type Params = {
   '/admin/orders/:id': { id: string }
   '/admin/users/:id': { id: string }
+  '/category/:id': { id: string }
   '/order/:id': { id: string }
   '/product/:id': { id: string }
 }

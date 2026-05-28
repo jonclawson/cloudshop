@@ -5,6 +5,7 @@ import productsRoutes from './routes/products';
 import ordersRoutes from './routes/orders';
 import uploadsRoutes from './routes/uploads';
 import adminRoutes from './routes/admin';
+import categoriesRoutes from './routes/categories';
 import { getDb, schema } from './db';
 import { eq } from 'drizzle-orm';
 import { hashPassword } from './services/authUtils';
@@ -66,6 +67,7 @@ app.use('*', cors());
 // Routes
 app.route('/api/auth', authRoutes);
 app.route('/api/products', productsRoutes);
+app.route('/api/categories', categoriesRoutes);
 app.route('/api/orders', ordersRoutes);
 app.route('/api/uploads', uploadsRoutes);
 app.route('/api/admin', adminRoutes);

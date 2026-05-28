@@ -257,10 +257,15 @@ export const authApi = {
 };
 
 export const productsApi = {
-  getAll: (provider?: 'printful') =>
-    sendRequest<{ products?: unknown[] }>(
-      `/api/products${provider ? `?provider=${encodeURIComponent(provider)}` : ''}`
-    ),
+  getAll: (provider?: 'printful', categoryId?: string) => {
+    const params: string[] = [];
+    if (provider) params.push(`provider=${encodeURIComponent(provider)}`);
+    if (categoryId) params.push(`category_id=${encodeURIComponent(categoryId)}`);
+
+    const query = params.length > 0 ? `?${params.join('&')}` : '';
+
+    return sendRequest<{ products?: unknown[] }>(`/api/products${query}`);
+  },
 
   getById: (id: string) => sendRequest<unknown>(`/api/products/${id}`),
 };

@@ -181,7 +181,12 @@ function getProductsSource(c: { env: PrintfulEnv }): 'mocks' | 'printful' {
   return useMocks ? 'mocks' : 'printful';
 }
 
-async function fetchPrintfulProductsPage(env: PrintfulEnv, limit: number, offset: number): Promise<PrintfulListResponse> {
+async function fetchPrintfulProductsPage(
+  env: PrintfulEnv,
+  limit: number,
+  offset: number,
+  categoryId?: string
+): Promise<PrintfulListResponse> {
   const apiKey = env.PRINTFUL_API_KEY;
   if (!apiKey) {
     throw new Error('MISSING_PRINTFUL_API_KEY');
@@ -190,6 +195,9 @@ async function fetchPrintfulProductsPage(env: PrintfulEnv, limit: number, offset
   const url = new URL('https://api.printful.com/products');
   url.searchParams.set('limit', String(limit));
   url.searchParams.set('offset', String(offset));
+  if (categoryId) {
+    url.searchParams.set('category_id', categoryId);
+  }
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -261,20 +269,21 @@ async function getMockProducts(env: PrintfulEnv): Promise<PrintfulProductRespons
 
 export async function getPrintfulProducts(
   c: { env: PrintfulEnv },
-  options?: { maxProducts?: number; cacheTtlMs?: number }
+  options?: { maxProducts?: number; cacheTtlMs?: number; categoryId?: string }
 ) {
   const maxProducts = options?.maxProducts ?? 200;
   const cacheTtlMs = options?.cacheTtlMs ?? 5 * 60 * 1000; // 5 minutes
+  const categoryId = options?.categoryId;
 
   const productsSource = getProductsSource(c);
 
-  const nowMs = Date.now();
-  if (
-    cachedProducts &&
-    cachedProductsSource === productsSource &&
-    nowMs < cacheExpiresAtMs
-  ) {
-    return cachedProducts.slice(0, maxProducts);
+  // Don’t use the global cache when filtering by category; the cached data was built
+  // for the unfiltered list.
+  if (!categoryId) {
+    const nowMs = Date.now();
+    if (cachedProducts && cachedProductsSource === productsSource && nowMs < cacheExpiresAtMs) {
+      return cachedProducts.slice(0, maxProducts);
+    }
   }
 
   // In local/dev, prefer mocks (or if PRINTFUL_API_KEY isn't present).
@@ -302,7 +311,7 @@ export async function getPrintfulProducts(
   for (let page = 0; page < 50; page++) {
     if (all.length >= maxProducts) break;
 
-    const data = await fetchPrintfulProductsPage(c.env, limitPerPage, offset);
+    const data = await fetchPrintfulProductsPage(c.env, limitPerPage, offset, categoryId);
 
     const rawResult = (data as PrintfulListResponse).result;
     const productsArray = Array.isArray(rawResult) ? rawResult : [];
@@ -323,11 +332,14 @@ export async function getPrintfulProducts(
     if (productsArray.length === 0) break;
   }
 
-  cachedProducts = all;
-  cachedProductsSource = 'printful';
-  cacheExpiresAtMs = Date.now() + cacheTtlMs;
+  if (!categoryId) {
+    cachedProducts = all;
+    cachedProductsSource = 'printful';
+    cacheExpiresAtMs = Date.now() + cacheTtlMs;
+    return cachedProducts.slice(0, maxProducts);
+  }
 
-  return cachedProducts.slice(0, maxProducts);
+  return all.slice(0, maxProducts);
 }
 
 export async function getPrintfulVariantById(c: { env: PrintfulEnv }, id: string) {
@@ -370,6 +382,63 @@ export async function getPrintfulVariantById(c: { env: PrintfulEnv }, id: string
     size,
     color,
   };
+}
+
+export type PrintfulCategoryResponse = {
+  id: number;
+  title: string;
+  imageUrl: string;
+};
+
+type PrintfulCategoriesResponse = {
+  code?: number;
+  result?: {
+    categories?: Array<{
+      id?: number | string;
+      title?: string;
+      image_url?: string;
+      imageUrl?: string;
+    }>;
+  };
+};
+
+export async function getPrintfulCategories(c: { env: PrintfulEnv }): Promise<PrintfulCategoryResponse[]> {
+  const apiKey = c.env.PRINTFUL_API_KEY;
+  if (!apiKey) throw new Error('MISSING_PRINTFUL_API_KEY');
+
+  const url = new URL('https://api.printful.com/categories');
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`PRINTFUL_CATEGORIES_FAILED:${response.status}:${text.slice(0, 200)}`);
+  }
+
+  const data = (await response.json()) as PrintfulCategoriesResponse;
+
+  const categoriesRaw = data?.result?.categories ?? [];
+  const normalized: PrintfulCategoryResponse[] = categoriesRaw
+    .map((cat) => {
+      const idNum = typeof cat.id === 'string' ? Number.parseInt(cat.id, 10) : cat.id;
+      if (!Number.isFinite(idNum as number)) return null;
+
+      const title = typeof cat.title === 'string' ? cat.title : '';
+      const imageUrl = typeof (cat.image_url ?? cat.imageUrl) === 'string' ? String(cat.image_url ?? cat.imageUrl) : '';
+
+      if (!title || !imageUrl) return null;
+
+      return { id: idNum as number, title, imageUrl };
+    })
+    .filter((x): x is PrintfulCategoryResponse => Boolean(x));
+
+  return normalized;
 }
 
 export async function getPrintfulProductById(c: { env: PrintfulEnv }, id: string) {

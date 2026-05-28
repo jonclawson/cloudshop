@@ -9,7 +9,7 @@ export type PrintfulProductListItem = {
   image?: string;
 };
 
-export function usePrintfulProducts() {
+export function usePrintfulProducts(categoryId?: string) {
   const [products, setProducts] = useState<PrintfulProductListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export function usePrintfulProducts() {
         setLoading(true);
         setError(null);
 
-        const response = await productsApi.getAll('printful');
+        const response = await productsApi.getAll('printful', categoryId);
         const next = (response.data.products ?? []) as PrintfulProductListItem[];
 
         if (!cancelled) setProducts(next);
@@ -41,7 +41,7 @@ export function usePrintfulProducts() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [categoryId]);
 
   return { products, loading, error } as const;
 }

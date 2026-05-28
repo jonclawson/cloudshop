@@ -96,12 +96,16 @@ function mergeDbAndPrintfulProducts(
 products.get('/', async (c) => {
   try {
     const provider = c.req.query('provider');
+    const categoryId = c.req.query('category_id');
 
     // --- Printful-only mode ---
     if (provider === 'printful') {
       let printfulProducts: PrintfulProductResponse[] = [];
       try {
-        const fetched = await getPrintfulProducts(c, { maxProducts: 200 });
+        const fetched = await getPrintfulProducts(c, {
+          maxProducts: 200,
+          categoryId: categoryId || undefined,
+        });
         console.log(`Fetched ${fetched.length} products from Printful`);
         printfulProducts = fetched;
       } catch (err) {
