@@ -257,7 +257,10 @@ export const authApi = {
 };
 
 export const productsApi = {
-  getAll: () => sendRequest<{ products?: unknown[] }>(`/api/products`),
+  getAll: (provider?: 'printful') =>
+    sendRequest<{ products?: unknown[] }>(
+      `/api/products${provider ? `?provider=${encodeURIComponent(provider)}` : ''}`
+    ),
 
   getById: (id: string) => sendRequest<unknown>(`/api/products/${id}`),
 };

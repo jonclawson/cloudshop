@@ -1,77 +1,28 @@
-import { useEffect, useState } from 'react';
-import { productsApi } from '../useApi';
-import { Link } from 'react-router-dom';
-
-type Product = {
-  id: string;
-  title?: string;
-  description?: string;
-  variants?: Array<{ price?: number }>;
-  image?: string;
-};
+import ProductsSection, { type ProductCard } from '../components/products';
+import { useProducts } from '../hooks/useProducts';
+import { usePrintfulProducts } from '../hooks/usePrintfulProducts';
 
 export default function HomePage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { products: dbProducts, loading: dbLoading, error: dbError } = useProducts();
+  const { products: printfulProducts, loading: printfulLoading, error: printfulError } = usePrintfulProducts();
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await productsApi.getAll();
-        setProducts((response.data.products || []) as Product[]);
-      } catch (error) {
-        console.error('Failed to fetch products:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, []);
+  const dbCards = dbProducts as ProductCard[];
+  const printfulCards = printfulProducts as ProductCard[];
 
   return (
     <div className="main-class">
-      
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-gray-900">Our Products</h2>
+      </div>
 
-      {/* Main Content */}
-        <h2 className="text-2xl font-bold text-gray-900 mb-8">Our Products</h2>
+      {dbError ? <p className="text-sm text-red-600 mb-6">{dbError}</p> : null}
+      <ProductsSection title="Database Products" products={dbCards} />
+      {dbLoading ? <p className="text-sm text-gray-600 mt-2">Loading database products...</p> : null}
 
-        {loading ? (
-          <p>Loading products...</p>
-        ) : products.length === 0 ? (
-          <p>No products available</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map((product: Product, index: number) => (
-              <Link
-                key={product.id + index}
-                to={`/product/${product.id}`}
-                className="block p-4 border border-gray-200 rounded-lg hover:shadow-lg transition"
-              >
-                {product.image ? (
-                  <img
-                    src={product.image}
-                    alt={product.title ?? 'Product image'}
-                    className="w-full h-32 object-cover rounded-md mb-3 border border-gray-200"
-                    loading="lazy"
-                  />
-                ) : null}
-                <h3 className="font-semibold text-gray-900">{product.title}</h3>
-                <p
-                  className="text-sm text-gray-600 line-clamp-3"
-                  title={product.description ?? ''}
-                >
-                  {product.description}
-                </p>
-                {product.variants && product.variants.length > 0 && (
-                  <p className="text-sm text-gray-500 mt-2">
-                    From ${product.variants[0].price}
-                  </p>
-                )}
-              </Link>
-            ))}
-          </div>
-        )}
+      <div className="mt-10" />
+      {printfulError ? <p className="text-sm text-red-600 mb-6">{printfulError}</p> : null}
+      <ProductsSection title="Printful Products" products={printfulCards} />
+      {printfulLoading ? <p className="text-sm text-gray-600 mt-2">Loading printful products...</p> : null}
     </div>
   );
 }

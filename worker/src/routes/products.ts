@@ -95,9 +95,30 @@ function mergeDbAndPrintfulProducts(
 
 products.get('/', async (c) => {
   try {
+    const provider = c.req.query('provider');
+
+    // --- Printful-only mode ---
+    if (provider === 'printful') {
+      let printfulProducts: PrintfulProductResponse[] = [];
+      try {
+        const fetched = await getPrintfulProducts(c, { maxProducts: 200 });
+        console.log(`Fetched ${fetched.length} products from Printful`);
+        printfulProducts = fetched;
+      } catch (err) {
+        console.error('Failed to fetch Printful products:', err);
+        printfulProducts = [];
+      }
+
+      return c.json({
+        products: printfulProducts as unknown as ProductResponse[],
+        count: printfulProducts.length,
+        synced_at: null,
+      });
+    }
+
+    // --- DB-only mode (default) ---
     const db = getDb(c.env.DB);
 
-    // --- DB products ---
     const productRows = await db
       .select({
         id: schema.products.id,
@@ -167,25 +188,9 @@ products.get('/', async (c) => {
       }
     }
 
-    const dbProviderProductIds = new Set(productRows.map((p) => String(p.provider_product_id)));
-
-    // --- Printful products (live, no DB writes) ---
-    let printfulProducts: PrintfulProductResponse[] = [];
-    try {
-      const fetched = await getPrintfulProducts(c, { maxProducts: 200 });
-      console.log(`Fetched ${fetched.length} products from Printful`);  
-      printfulProducts = fetched;
-    } catch (err) {
-      // If Printful fails (missing key, network, etc.), keep DB behavior.
-      console.error('Failed to fetch Printful products:', err);
-      printfulProducts = [];
-    }
-
-    const merged = mergeDbAndPrintfulProducts(dbProducts, dbProviderProductIds, printfulProducts);
-
     return c.json({
-      products: merged,
-      count: merged.length,
+      products: dbProducts,
+      count: dbProducts.length,
       synced_at: null,
     });
   } catch (error) {
