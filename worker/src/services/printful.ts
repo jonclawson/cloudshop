@@ -12,6 +12,9 @@ export type PrintfulProductVariantResponse = {
   size?: string | null;
   color?: string | null;
   price: number; // dollars
+
+  // Used by product detail page (GET /api/products/:id)
+  images?: string[];
 };
 
 export type PrintfulProductResponse = {
@@ -24,6 +27,9 @@ export type PrintfulProductResponse = {
 
   // Used by the UI product list page (GET /api/products)
   image?: string;
+
+  // Used by the product detail page thumbnails (GET /api/products/:id)
+  images?: string[];
 };
 
 type PrintfulListResponse = {
@@ -49,13 +55,21 @@ function asString(value: unknown): string | undefined {
 }
 
 function normalizeMoneyToDollars(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
-
-  if (Number.isInteger(value) && value > 1000) {
-    return value / 100;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return 0;
+    if (Number.isInteger(value) && value > 1000) return value / 100;
+    return value;
   }
 
-  return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed)) return 0;
+    // If Printful ever returns "1999" (cents), we can still handle it.
+    if (Number.isInteger(parsed) && parsed > 1000) return parsed / 100;
+    return parsed;
+  }
+
+  return 0;
 }
 
 function normalizeMarkdownDescription(value: string | undefined): string | null {
@@ -84,6 +98,8 @@ function normalizePrintfulVariant(variant: UnknownRecord): PrintfulProductVarian
 
   const title = asString(variant.title) ?? formatVariantTitle(size, color);
 
+  const imageFromPayload = asString(variant.image);
+
   return {
     id,
     external_id: externalId,
@@ -91,10 +107,11 @@ function normalizePrintfulVariant(variant: UnknownRecord): PrintfulProductVarian
     size: size ?? null,
     color: color ?? null,
     price,
+    images: imageFromPayload ? [imageFromPayload] : undefined,
   };
 }
 
-function normalizePrintfulProduct(product: UnknownRecord): PrintfulProductResponse {
+function normalizePrintfulProduct(product: UnknownRecord, variantsOverrideRaw?: unknown): PrintfulProductResponse {
   const externalId = asString(product.external_id);
   const printfulId = asString(product.id) ?? crypto.randomUUID();
 
@@ -102,7 +119,9 @@ function normalizePrintfulProduct(product: UnknownRecord): PrintfulProductRespon
   // This allows /api/products/:id to resolve without DB writes.
   const storefrontProductId = externalId ?? printfulId;
 
-  const variantsRaw = product.variants;
+  const variantsRaw =
+    variantsOverrideRaw !== undefined ? variantsOverrideRaw : (product.variants as unknown);
+
   const variantsList = Array.isArray(variantsRaw) ? variantsRaw : [];
 
   const variants: PrintfulProductVariantResponse[] = variantsList
@@ -114,22 +133,30 @@ function normalizePrintfulProduct(product: UnknownRecord): PrintfulProductRespon
   const name = asString(product.name);
   const title = asString(product.title) ?? name;
 
-  // Printful payload: `image`
+  // Printful payload
   const imageFromPayload = asString(product.image);
 
+  // Product detail wants `images: string[]`
   // Mock fallback: `images: string[]`
-  const imagesRaw = product.images;
-  const firstMockImage =
-    Array.isArray(imagesRaw) ? imagesRaw.map((x) => (typeof x === 'string' ? x : '')).find(Boolean) : undefined;
+  const imagesRaw = (product as any).images;
+  const mockImages =
+    Array.isArray(imagesRaw)
+      ? imagesRaw.map((x) => (typeof x === 'string' ? x : '')).filter(Boolean)
+      : undefined;
+
+  const imagesFromPayload = imageFromPayload ? [imageFromPayload] : undefined;
+
+  const productImageForList = imageFromPayload ?? mockImages?.[0];
 
   return {
     id: storefrontProductId,
     external_id: externalId,
     title,
     name,
-    description: normalizeMarkdownDescription(asString(product.description)),
+    description: normalizeMarkdownDescription(asString((product as any).description)),
     variants,
-    image: imageFromPayload ?? firstMockImage,
+    image: productImageForList,
+    images: imagesFromPayload ?? mockImages,
   };
 }
 
@@ -212,7 +239,12 @@ async function fetchPrintfulProductById(env: PrintfulEnv, id: string): Promise<P
   }
   console.log(`Fetched product ${id} from Printful`, rawProduct);
 
-  return normalizePrintfulProduct(rawProduct.product as UnknownRecord);
+  // Printful detail endpoint returns:
+  // { result: { product: {...}, variants: [...] } }
+  // so we must normalize variants from `result.variants`, not from `result.product.variants`.
+  const rawVariants = (rawProduct as any).variants;
+
+  return normalizePrintfulProduct(rawProduct.product as UnknownRecord, rawVariants);
 }
 
 async function getMockProducts(env: PrintfulEnv): Promise<PrintfulProductResponse[]> {
