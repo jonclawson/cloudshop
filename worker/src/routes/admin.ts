@@ -42,7 +42,7 @@ admin.post('/sync-products', verifyJWT, async (c) => {
     const db = getDb(c.env.DB);
 
     const syncedAtMs = result.synced_at;
-    const provider = 'printful';
+    const provider = 'mock-printful';
     const providerProducts = result.products;
 
     function filenameFromUrl(url: string): string {
