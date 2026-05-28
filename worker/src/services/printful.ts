@@ -330,6 +330,48 @@ export async function getPrintfulProducts(
   return cachedProducts.slice(0, maxProducts);
 }
 
+export async function getPrintfulVariantById(c: { env: PrintfulEnv }, id: string) {
+  const apiKey = c.env.PRINTFUL_API_KEY;
+  if (!apiKey) throw new Error('MISSING_PRINTFUL_API_KEY');
+
+  const url = new URL(`https://api.printful.com/products/variant/${encodeURIComponent(id)}`);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (response.status === 404) {
+    throw new Error('PRINTFUL_VARIANT_NOT_FOUND');
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`PRINTFUL_VARIANT_FAILED:${response.status}:${text.slice(0, 200)}`);
+  }
+
+  const data = (await response.json()) as { result?: unknown };
+  const raw = (data as any).result ?? data;
+
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('PRINTFUL_VARIANT_INVALID_PAYLOAD');
+  }
+
+  const variant = (raw as any).variant ?? raw;
+
+  const size = asString(variant.size) ?? null;
+  const color = asString(variant.color) ?? null;
+
+  return {
+    id: asString(variant.id) ?? id,
+    size,
+    color,
+  };
+}
+
 export async function getPrintfulProductById(c: { env: PrintfulEnv }, id: string) {
   // Prefer the dedicated endpoint first to avoid O(n) list fetches.
   // If it doesn't work (e.g. id is external_id and the endpoint expects internal id),

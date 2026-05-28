@@ -8,7 +8,7 @@ import {
   generateRefreshToken,
   hashPassword,
 } from '../services/authUtils';
-import { getPrintfulProducts } from '../services/printful';
+import { getPrintfulProducts, getPrintfulVariantById } from '../services/printful';
 
 type Bindings = {
   DB: D1Database;
@@ -410,6 +410,9 @@ orders.get('/:id', verifyJWT, async (c) => {
       { productTitle: string; productSku: string; size: string | null; color: string | null }
     > = new Map();
 
+    // More reliable size/color: fetch per-variant from Printful's variant endpoint.
+    let printfulVariantSizeColorIndex: Map<string, { size: string | null; color: string | null }> = new Map();
+
     if (needsPrintfulHydration) {
       const printfulProducts = await getPrintfulProducts(
         { env: c.env as any },
@@ -429,6 +432,31 @@ orders.get('/:id', verifyJWT, async (c) => {
           });
         }
       }
+
+      const variantIdList = [
+        ...new Set(
+          itemRows
+            .filter((r) => r.provider === 'printful')
+            .map((r) => String(r.product_variant_id))
+        ),
+      ];
+
+      await Promise.all(
+        variantIdList.map(async (variantId) => {
+          try {
+            const v = await getPrintfulVariantById(
+              { env: c.env as any },
+              variantId
+            );
+            printfulVariantSizeColorIndex.set(variantId, {
+              size: v.size ?? null,
+              color: v.color ?? null,
+            });
+          } catch {
+            // Keep missing entries; mapping will fall back to list-based values.
+          }
+        })
+      );
     }
 
     return c.json({
@@ -437,9 +465,12 @@ orders.get('/:id', verifyJWT, async (c) => {
       status: order.status,
       total_price: order.total_price,
       created_at: order.created_at,
-      items: itemRows.map((row) => {
+        items: itemRows.map((row) => {
         if (row.provider === 'printful') {
-          const idx = printfulVariantIndex.get(String(row.product_variant_id));
+          const vid = String(row.product_variant_id);
+          const idx = printfulVariantIndex.get(vid);
+          const sc = printfulVariantSizeColorIndex.get(vid);
+
           return {
             order_item_id: row.order_item_id,
             product_variant_id: row.product_variant_id,
@@ -447,8 +478,8 @@ orders.get('/:id', verifyJWT, async (c) => {
             price_at_purchase: row.price_at_purchase,
             product_name: row.product_name ?? idx?.productTitle ?? `Printful ${row.product_variant_id}`,
             product_sku: row.product_sku ?? idx?.productSku ?? `printful-${row.product_variant_id}`,
-            size: idx?.size ?? row.size ?? null,
-            color: idx?.color ?? row.color ?? null,
+            size: sc?.size ?? idx?.size ?? row.size ?? null,
+            color: sc?.color ?? idx?.color ?? row.color ?? null,
           };
         }
 
