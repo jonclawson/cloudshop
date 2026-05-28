@@ -16,13 +16,13 @@ export default function HomePage() {
       </div>
 
       {dbError ? <p className="text-sm text-red-600 mb-6">{dbError}</p> : null}
-      <ProductsSection title="Database Products" products={dbCards} />
-      {dbLoading ? <p className="text-sm text-gray-600 mt-2">Loading database products...</p> : null}
+      <ProductsSection title="Featured Products" products={dbCards} />
+      {dbLoading ? <p className="text-sm text-gray-600 mt-2">Loading featured products...</p> : null}
 
       <div className="mt-10" />
       {printfulError ? <p className="text-sm text-red-600 mb-6">{printfulError}</p> : null}
-      <ProductsSection title="Printful Products" products={printfulCards} />
-      {printfulLoading ? <p className="text-sm text-gray-600 mt-2">Loading printful products...</p> : null}
+      <ProductsSection title="Products" products={printfulCards} />
+      {printfulLoading ? <p className="text-sm text-gray-600 mt-2">Loading products...</p> : null}
     </div>
   );
 }
