@@ -9,6 +9,7 @@ type CartLine = {
   name: string;
   variantId?: string;
   productId?: string;
+  provider?: 'printful' | string;
   quantity: number;
   price: number; // cents
   currency: string;
@@ -63,6 +64,7 @@ export default function CheckoutPage() {
       name: item.name,
       variantId: item.variantId ? String(item.variantId) : undefined,
       productId: item.productId ? String(item.productId) : undefined,
+      provider: item.provider,
       quantity: item.quantity,
       price: item.price,
       currency: item.currency,

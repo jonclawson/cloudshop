@@ -8,6 +8,7 @@ import {
   generateRefreshToken,
   hashPassword,
 } from '../services/authUtils';
+import { getPrintfulProducts } from '../services/printful';
 
 type Bindings = {
   DB: D1Database;
@@ -15,6 +16,7 @@ type Bindings = {
   USE_MOCKS?: string;
   JWT_SECRET?: string;
   KV: KVNamespace;
+  PRINTFUL_API_KEY?: string;
 };
 
 const orders = new Hono<{ Bindings }>();
@@ -24,6 +26,7 @@ type OrderRequestItem = {
   name?: string;
   variantId?: string;
   productId?: string;
+  provider?: 'printful' | string;
   quantity?: number;
   price?: number; // cents (from use-shopping-cart)
   currency?: string;
@@ -116,7 +119,8 @@ orders.post('/', optionalAuth, async (c) => {
   // ---- Rate limiting (anonymous checkout path) ----
   // For authenticated users, keep the behavior unchanged (no extra limiting).
   if (!authUserId) {
-    const emailForKey = typeof body.email === 'string' && body.email ? normalizeEmail(body.email) : 'missing-email';
+    const emailForKey =
+      typeof body.email === 'string' && body.email ? normalizeEmail(body.email) : 'missing-email';
     const ip =
       c.req.header('CF-Connecting-IP') ||
       c.req.header('X-Forwarded-For') ||
@@ -153,7 +157,7 @@ orders.post('/', optionalAuth, async (c) => {
   }
 
   // ---- Ensure referenced FK rows exist to avoid FOREIGN KEY constraint failures ----
-  // order_items.product_variant_id -> product_variants.id -> product_id -> products.id
+  // For printful items, we do NOT create DB synthetic products/variants.
   const variantIds = new Set<string>();
   const productIds = new Set<string>();
   const productIdByVariantId = new Map<string, string>();
@@ -162,6 +166,8 @@ orders.post('/', optionalAuth, async (c) => {
   for (const item of cartItems) {
     if (!item.variantId) throw new Error('Missing variantId on order item');
     if (!item.productId) throw new Error('Missing productId on order item');
+
+    const isPrintful = item.provider === 'printful';
 
     const variantId = String(item.variantId);
     const productId = String(item.productId);
@@ -176,12 +182,15 @@ orders.post('/', optionalAuth, async (c) => {
       throw new Error('Invalid price on order item');
     }
 
-    variantIds.add(variantId);
-    productIds.add(productId);
-    productIdByVariantId.set(variantId, productId);
+    // Only build FK insertion sets for non-printful items.
+    if (!isPrintful) {
+      variantIds.add(variantId);
+      productIds.add(productId);
+      productIdByVariantId.set(variantId, productId);
 
-    if (!productBasePriceDollarsByProductId.has(productId)) {
-      productBasePriceDollarsByProductId.set(productId, toMoneyDollarsFromCents(priceCents));
+      if (!productBasePriceDollarsByProductId.has(productId)) {
+        productBasePriceDollarsByProductId.set(productId, toMoneyDollarsFromCents(priceCents));
+      }
     }
   }
 
@@ -189,7 +198,7 @@ orders.post('/', optionalAuth, async (c) => {
   const variantIdList = [...variantIds];
   const productIdList = [...productIds];
 
-  // Insert missing products
+  // Insert missing products (non-printful only)
   if (productIdList.length > 0) {
     const existingProducts = await db
       .select({ id: schema.products.id })
@@ -216,7 +225,7 @@ orders.post('/', optionalAuth, async (c) => {
     }
   }
 
-  // Insert missing product variants
+  // Insert missing product variants (non-printful only)
   if (variantIdList.length > 0) {
     const existingVariants = await db
       .select({ id: schema.productVariants.id })
@@ -254,20 +263,20 @@ orders.post('/', optionalAuth, async (c) => {
     if (!variantId) throw new Error('Missing variantId on order item');
     if (!productId) throw new Error('Missing productId on order item');
 
+    const isPrintful = item.provider === 'printful';
+
     return {
       id: crypto.randomUUID(),
       order_id: orderId,
       product_variant_id: variantId,
+      provider: isPrintful ? 'printful' : null,
       quantity,
       price_at_purchase: toMoneyDollarsFromCents(priceCents),
       user_upload_id: null as string | null,
     };
   });
 
-  const totalPrice = orderItemRows.reduce(
-    (sum, row) => sum + row.price_at_purchase * row.quantity,
-    0
-  );
+  const totalPrice = orderItemRows.reduce((sum, row) => sum + row.price_at_purchase * row.quantity, 0);
 
   const jwtSecret = c.env.JWT_SECRET || 'dev-secret';
 
@@ -353,7 +362,6 @@ orders.get('/:id', verifyJWT, async (c) => {
   const { userId } = auth;
 
   const id = c.req.param('id');
-
   const db = getDb(c.env.DB);
 
   try {
@@ -377,20 +385,51 @@ orders.get('/:id', verifyJWT, async (c) => {
       .select({
         order_item_id: schema.orderItems.id,
         product_variant_id: schema.orderItems.product_variant_id,
+        provider: schema.orderItems.provider,
+
         quantity: schema.orderItems.quantity,
         price_at_purchase: schema.orderItems.price_at_purchase,
+
         product_name: schema.products.name,
         product_sku: schema.products.sku,
         size: schema.productVariants.size,
         color: schema.productVariants.color,
       })
       .from(schema.orderItems)
-      .innerJoin(
+      .leftJoin(
         schema.productVariants,
         eq(schema.orderItems.product_variant_id, schema.productVariants.id)
       )
-      .innerJoin(schema.products, eq(schema.productVariants.product_id, schema.products.id))
+      .leftJoin(schema.products, eq(schema.productVariants.product_id, schema.products.id))
       .where(eq(schema.orderItems.order_id, id));
+
+    const needsPrintfulHydration = itemRows.some((r) => r.provider === 'printful');
+
+    let printfulVariantIndex: Map<
+      string,
+      { productTitle: string; productSku: string; size: string | null; color: string | null }
+    > = new Map();
+
+    if (needsPrintfulHydration) {
+      const printfulProducts = await getPrintfulProducts(
+        { env: c.env as any },
+        { maxProducts: 500 }
+      );
+
+      for (const prod of printfulProducts) {
+        const productTitle = prod.title ?? prod.name ?? '';
+        const productSku = String(prod.external_id ?? prod.id);
+
+        for (const v of prod.variants ?? []) {
+          printfulVariantIndex.set(String(v.id), {
+            productTitle,
+            productSku,
+            size: v.size ?? null,
+            color: v.color ?? null,
+          });
+        }
+      }
+    }
 
     return c.json({
       order_id: order.id,
@@ -398,16 +437,32 @@ orders.get('/:id', verifyJWT, async (c) => {
       status: order.status,
       total_price: order.total_price,
       created_at: order.created_at,
-      items: itemRows.map((row) => ({
-        order_item_id: row.order_item_id,
-        product_variant_id: row.product_variant_id,
-        quantity: row.quantity,
-        price_at_purchase: row.price_at_purchase,
-        product_name: row.product_name,
-        product_sku: row.product_sku,
-        size: row.size,
-        color: row.color,
-      })),
+      items: itemRows.map((row) => {
+        if (row.provider === 'printful') {
+          const idx = printfulVariantIndex.get(String(row.product_variant_id));
+          return {
+            order_item_id: row.order_item_id,
+            product_variant_id: row.product_variant_id,
+            quantity: row.quantity,
+            price_at_purchase: row.price_at_purchase,
+            product_name: row.product_name ?? idx?.productTitle ?? `Printful ${row.product_variant_id}`,
+            product_sku: row.product_sku ?? idx?.productSku ?? `printful-${row.product_variant_id}`,
+            size: idx?.size ?? row.size ?? null,
+            color: idx?.color ?? row.color ?? null,
+          };
+        }
+
+        return {
+          order_item_id: row.order_item_id,
+          product_variant_id: row.product_variant_id,
+          quantity: row.quantity,
+          price_at_purchase: row.price_at_purchase,
+          product_name: row.product_name,
+          product_sku: row.product_sku,
+          size: row.size,
+          color: row.color,
+        };
+      }),
     });
   } catch (error) {
     console.error('Get order failed:', error);

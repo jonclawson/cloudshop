@@ -22,6 +22,9 @@ type Product = {
   description?: string;
   variants?: ProductVariant[];
   images?: string[]; // product images
+
+  // Printful-normalized products set this.
+  provider?: 'printful' | string;
 };
 
 export default function ProductPage() {
@@ -89,6 +92,7 @@ export default function ProductPage() {
       image: '',
       variantId: String(selectedVariant.id),
       productId: String(product.id),
+      provider: product.provider,
     });
     router('/cart');
   };

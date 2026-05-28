@@ -19,6 +19,7 @@ export type PrintfulProductVariantResponse = {
 
 export type PrintfulProductResponse = {
   id: string;
+  provider: 'printful';
   external_id?: string;
   title?: string;
   name?: string;
@@ -151,6 +152,7 @@ function normalizePrintfulProduct(product: UnknownRecord, variantsOverrideRaw?: 
   return {
     id: storefrontProductId,
     external_id: externalId,
+    provider: 'printful',
     title,
     name,
     description: normalizeMarkdownDescription(asString((product as any).description)),
