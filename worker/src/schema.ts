@@ -76,6 +76,7 @@ export const orders = sqliteTable('orders', {
 export const orderItems = sqliteTable('order_items', {
   id: text('id').primaryKey().default('uuid()'),
   order_id: text('order_id').notNull(),
+  provider: text('provider'),
   product_variant_id: text('product_variant_id').notNull(),
   quantity: integer('quantity').notNull(),
   price_at_purchase: real('price_at_purchase').notNull(),
