@@ -42,9 +42,9 @@ export default function HomePage() {
           <p>No products available</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map((product: Product) => (
+            {products.map((product: Product, index: number) => (
               <Link
-                key={product.id}
+                key={product.id + index}
                 to={`/product/${product.id}`}
                 className="block p-4 border border-gray-200 rounded-lg hover:shadow-lg transition"
               >
