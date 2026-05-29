@@ -1,5 +1,5 @@
-import { useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useMemo } from "react";
 
 export type CategoryNavItem = {
   id: string;
@@ -13,9 +13,13 @@ type CategoryNavProps = {
   className?: string;
 };
 
-function toNumberOrNull(value: number | null | undefined): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  return value;
+function normalizeParentId(parentId: CategoryNavItem["parentId"]): number {
+  if (typeof parentId !== "number" || !Number.isFinite(parentId)) return 0;
+  return parentId;
+}
+
+function sortByTitle<T extends { title: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export default function CategoryNav({
@@ -25,7 +29,6 @@ export default function CategoryNav({
 }: CategoryNavProps) {
   const currentId = String(currentCategoryId);
 
-  // Dedupe by id to avoid React duplicate key issues.
   const uniqueCategories = useMemo(() => {
     const map = new Map<string, CategoryNavItem>();
     for (const cat of categories) {
@@ -43,11 +46,29 @@ export default function CategoryNav({
 
   const currentCategory = categoriesById.get(currentId) ?? null;
 
-  const topLevelId = useMemo(() => {
-    // Find the top-level ancestor: parentId == 0 (or no parent / invalid).
-    // Walk up current -> ... -> top
-    let cursorId: string | null = currentId;
+  const childrenByParentId = useMemo(() => {
+    const map = new Map<number, CategoryNavItem[]>();
+
+    for (const cat of uniqueCategories) {
+      const pid = normalizeParentId(cat.parentId);
+      const list = map.get(pid) ?? [];
+      list.push(cat);
+      map.set(pid, list);
+    }
+
+    for (const [pid, list] of map.entries()) {
+      map.set(pid, sortByTitle(list));
+    }
+
+    return map;
+  }, [uniqueCategories]);
+
+  // Ancestor chain: top-level -> ... -> current
+  const ancestorChain = useMemo(() => {
+    const chain: CategoryNavItem[] = [];
     const visited = new Set<string>();
+
+    let cursorId: string | null = currentId;
 
     while (cursorId) {
       if (visited.has(cursorId)) break;
@@ -56,59 +77,21 @@ export default function CategoryNav({
       const cursor = categoriesById.get(cursorId);
       if (!cursor) break;
 
-      const parentId = toNumberOrNull(cursor.parentId);
-      if (parentId === null || parentId === 0) return cursorId;
+      chain.push(cursor);
 
-      cursorId = String(parentId);
+      const pid = normalizeParentId(cursor.parentId);
+      if (pid === 0) break;
+
+      cursorId = String(pid);
     }
 
-    return currentId;
+    return chain.reverse();
   }, [categoriesById, currentId]);
 
-  const topLevelCategory = categoriesById.get(topLevelId) ?? null;
+  const pathSet = useMemo(() => new Set(ancestorChain.map((c) => c.id)), [ancestorChain]);
+  const topLevelId = ancestorChain[0]?.id ?? null;
 
-  const otherTopLevels = useMemo(() => {
-    const list = uniqueCategories
-      .filter((c) => toNumberOrNull(c.parentId) === 0)
-      .map((c) => ({ ...c, id: String(c.id) }));
-    list.sort((a, b) => a.title.localeCompare(b.title));
-    return list.filter((c) => c.id !== topLevelId);
-  }, [uniqueCategories, topLevelId]);
-
-  const topLevelChildren = useMemo(() => {
-    const topIdNum = Number.parseInt(topLevelId, 10);
-    if (!Number.isFinite(topIdNum)) return [];
-
-    const list = uniqueCategories
-      .filter((c) => toNumberOrNull(c.parentId) === topIdNum)
-      .map((c) => ({ ...c, id: String(c.id) }));
-
-    list.sort((a, b) => a.title.localeCompare(b.title));
-    return list;
-  }, [uniqueCategories, topLevelId]);
-
-  const parentOfCurrentId = useMemo(() => {
-    if (!currentCategory) return null;
-    const parentId = toNumberOrNull(currentCategory.parentId);
-    if (parentId === null || parentId === 0) return null;
-    return String(parentId);
-  }, [currentCategory]);
-
-  const siblingsOfCurrentPage = useMemo(() => {
-    // siblings of current page category = children of parentOfCurrentId
-    if (!parentOfCurrentId) return [];
-    const parentIdNum = Number.parseInt(parentOfCurrentId, 10);
-    if (!Number.isFinite(parentIdNum)) return [];
-
-    const list = uniqueCategories
-      .filter((c) => toNumberOrNull(c.parentId) === parentIdNum)
-      .map((c) => ({ ...c, id: String(c.id) }));
-
-    list.sort((a, b) => a.title.localeCompare(b.title));
-    return list;
-  }, [uniqueCategories, parentOfCurrentId]);
-
-  if (!currentCategory || !topLevelCategory) {
+  if (!currentCategory || !topLevelId) {
     return (
       <aside className={className ?? "w-full md:w-72 md:flex-shrink-0"}>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -118,6 +101,41 @@ export default function CategoryNav({
       </aside>
     );
   }
+
+  const renderChildren = (parentId: number, depth: number) => {
+    const children = childrenByParentId.get(parentId) ?? [];
+
+    if (children.length === 0) return null;
+
+    return (
+      <ul className="mt-2 space-y-2 ml-3 pl-3 border-l border-gray-200">
+        {children.map((child) => {
+          const active = child.id === currentId;
+          const onPath = pathSet.has(child.id);
+
+          return (
+            <li key={child.id}>
+              <Link
+                to={`/category/${child.id}`}
+                className={[
+                  "block rounded-md border px-3 py-2 text-sm transition",
+                  active
+                    ? "border-black bg-black text-white"
+                    : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50",
+                ].join(" ")}
+                aria-current={active ? "page" : undefined}
+              >
+                {child.title}
+              </Link>
+
+              {/* Expand direct children for nodes on the current path (including the current node). */}
+              {onPath ? renderChildren(Number(child.id), depth + 1) : null}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
 
   return (
     <aside className={className ?? "w-full md:w-72 md:flex-shrink-0"}>
@@ -132,108 +150,34 @@ export default function CategoryNav({
               By hierarchy
             </h3>
 
-            {/* Current top-level category: show all its children.
-                If a top-level child is the direct parent of the current category,
-                expand it to show the current category siblings (direct children). */}
+            {/* Show all top-level categories (parentId = 0) */}
             <ul className="space-y-2">
-              <li key={`top-${topLevelCategory.id}`}>
-                <Link
-                  to={`/category/${topLevelCategory.id}`}
-                  className={[
-                    "block rounded-md border px-3 py-2 text-sm transition",
-                    topLevelCategory.id === currentId
-                      ? "border-black bg-black text-white"
-                      : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50",
-                  ].join(" ")}
-                  aria-current={topLevelCategory.id === currentId ? "page" : undefined}
-                >
-                  {topLevelCategory.title}
-                </Link>
+              {(childrenByParentId.get(0) ?? []).map((tl) => {
+                const activeTop = tl.id === currentId;
+                const expandTop = tl.id === topLevelId;
 
-                <ul className="mt-2 space-y-2 ml-3 pl-3 border-l border-gray-200">
-                  {topLevelChildren.map((child, idx) => {
-                    const childKey = `${child.id}-${idx}`;
-                    const isParentOfCurrent = child.id === parentOfCurrentId;
+                return (
+                  <li key={tl.id}>
+                    <Link
+                      to={`/category/${tl.id}`}
+                      className={[
+                        "block rounded-md border px-3 py-2 text-sm transition",
+                        activeTop
+                          ? "border-black bg-black text-white"
+                          : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50",
+                      ].join(" ")}
+                      aria-current={activeTop ? "page" : undefined}
+                    >
+                      {tl.title}
+                    </Link>
 
-                    return (
-                      <li key={childKey}>
-                        <Link
-                          to={`/category/${child.id}`}
-                          className={[
-                            "block rounded-md border px-3 py-2 text-sm transition",
-                            child.id === currentId
-                              ? "border-black bg-black text-white"
-                              : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50",
-                          ].join(" ")}
-                          aria-current={child.id === currentId ? "page" : undefined}
-                        >
-                          {child.title}
-                        </Link>
-
-                        {isParentOfCurrent ? (
-                          <ul className="mt-2 space-y-2 ml-3 pl-3 border-l border-gray-200">
-                            {siblingsOfCurrentPage.length === 0 ? (
-                              <li className="text-sm text-gray-600">No sub-categories</li>
-                            ) : (
-                              siblingsOfCurrentPage.map((sib, sibIdx) => (
-                                <li key={`${sib.id}-${sibIdx}`}>
-                                  <Link
-                                    to={`/category/${sib.id}`}
-                                    className={[
-                                      "block rounded-md border px-3 py-2 text-sm transition",
-                                      sib.id === currentId
-                                        ? "border-black bg-black text-white"
-                                        : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50",
-                                    ].join(" ")}
-                                    aria-current={sib.id === currentId ? "page" : undefined}
-                                  >
-                                    {sib.title}
-                                  </Link>
-                                </li>
-                              ))
-                            )}
-                          </ul>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </li>
+                    {/* Only expand the currently active top-level category */}
+                    {expandTop ? renderChildren(0, 1) : null}
+                  </li>
+                );
+              })}
             </ul>
           </div>
-
-          {/* Other top-level categories (siblings of top-level) */}
-          {otherTopLevels.length > 0 ? (
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
-                Other top-level
-              </h3>
-
-              <ul className="space-y-2">
-                {otherTopLevels.map((cat, idx) => {
-                  const key = `${cat.id}-${idx}`;
-                  const active = cat.id === currentId;
-
-                  return (
-                    <li key={key}>
-                      <Link
-                        to={`/category/${cat.id}`}
-                        className={[
-                          "block rounded-md border px-3 py-2 text-sm transition",
-                          active
-                            ? "border-black bg-black text-white"
-                            : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50",
-                        ].join(" ")}
-                        aria-current={active ? "page" : undefined}
-                      >
-                        {cat.title}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : null}
         </nav>
       </div>
     </aside>
