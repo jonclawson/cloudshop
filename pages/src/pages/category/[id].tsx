@@ -1,14 +1,28 @@
-import ProductsSection, { type ProductCard } from '../../components/products';
+import { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import ProductsSection, { type ProductCard } from '../../components/products';
 import { usePrintfulProducts } from '../../hooks/usePrintfulProducts';
+import CategoryNav from '../../components/category-nav';
+import { useCategories } from '../../hooks/useCategories';
 
 export default function CategoryPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
+  const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
   const { products, loading, error } = usePrintfulProducts(id);
 
   const cards = products as unknown as ProductCard[];
+
+  const navCategories = useMemo(
+    () =>
+      (categories ?? []).map((c) => ({
+        id: String(c.id),
+        title: c.title,
+        parentId: typeof c.parentId === 'number' ? c.parentId : null,
+      })),
+    [categories]
+  );
 
   return (
     <div className="main-class">
@@ -23,10 +37,24 @@ export default function CategoryPage() {
         </button>
       </div>
 
-      {error ? <p className="text-sm text-red-600 mb-4">{error}</p> : null}
-      {loading ? <p className="text-sm text-gray-600 mb-4">Loading category products...</p> : null}
+      <div className="flex flex-col lg:flex-row gap-8">
+        <div className="md:block hidden">
+          {categoriesError ? (
+            <p className="text-sm text-red-600">Failed to load categories</p>
+          ) : categoriesLoading ? (
+            <p className="text-sm text-gray-600">Loading categories...</p>
+          ) : (
+            <CategoryNav currentCategoryId={id ?? ''} categories={navCategories} />
+          )}
+        </div>
 
-      <ProductsSection title="Printful Products" products={cards} />
+        <div className="flex-1">
+          {error ? <p className="text-sm text-red-600 mb-4">{error}</p> : null}
+          {loading ? <p className="text-sm text-gray-600 mb-4">Loading category products...</p> : null}
+
+          <ProductsSection title="Printful Products" products={cards} />
+        </div>
+      </div>
     </div>
   );
 }

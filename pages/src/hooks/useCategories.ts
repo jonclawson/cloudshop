@@ -3,6 +3,7 @@ import { useApi } from '../useApi';
 
 type Category = {
   id: string;
+  parentId?: number | null;
   title: string;
   image_url?: string;
   imageUrl?: string;
@@ -23,7 +24,7 @@ export function useCategories() {
         setError(null);
 
         const response = await api.get<{ categories?: Category[] }>(`/api/categories`);
-        const next = (response.data.categories ?? []) as Category[];
+        const next = (response.data.categories ?? []) as (Category & { parentId?: number })[];
 
         if (!cancelled) setCategories(next);
       } catch (e) {

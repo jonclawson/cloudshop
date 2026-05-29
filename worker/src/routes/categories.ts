@@ -10,6 +10,7 @@ const categories = new Hono<{ Bindings }>();
 
 type CategoryResponseItem = {
   id: number;
+  parentId: number;
   title: string;
   image_url: string;
 };
@@ -19,6 +20,7 @@ categories.get('/', async (c) => {
     const items = await getPrintfulCategories({ env: c.env as any });
     const categoriesList: CategoryResponseItem[] = items.map((x) => ({
       id: Number(x.id),
+      parentId: Number(x.parentId ?? 0),
       title: x.title,
       image_url: x.imageUrl,
     }));

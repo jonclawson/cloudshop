@@ -386,6 +386,7 @@ export async function getPrintfulVariantById(c: { env: PrintfulEnv }, id: string
 
 export type PrintfulCategoryResponse = {
   id: number;
+  parentId: number;
   title: string;
   imageUrl: string;
 };
@@ -429,12 +430,22 @@ export async function getPrintfulCategories(c: { env: PrintfulEnv }): Promise<Pr
       const idNum = typeof cat.id === 'string' ? Number.parseInt(cat.id, 10) : cat.id;
       if (!Number.isFinite(idNum as number)) return null;
 
+      const parentIdRaw =
+        typeof (cat as any).parent_id === 'string'
+          ? Number.parseInt((cat as any).parent_id, 10)
+          : (cat as any).parent_id;
+
+      const parentId = Number.isFinite(parentIdRaw) ? (parentIdRaw as number) : 0;
+
       const title = typeof cat.title === 'string' ? cat.title : '';
-      const imageUrl = typeof (cat.image_url ?? cat.imageUrl) === 'string' ? String(cat.image_url ?? cat.imageUrl) : '';
+      const imageUrl =
+        typeof (cat.image_url ?? cat.imageUrl) === 'string'
+          ? String(cat.image_url ?? cat.imageUrl)
+          : '';
 
       if (!title || !imageUrl) return null;
 
-      return { id: idNum as number, title, imageUrl };
+      return { id: idNum as number, parentId, title, imageUrl };
     })
     .filter((x): x is PrintfulCategoryResponse => Boolean(x));
 
