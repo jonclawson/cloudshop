@@ -19,6 +19,8 @@ export function usePrintfulProducts(categoryId?: string) {
 
     async function run() {
       try {
+        // Hide stale products immediately when category changes.
+        setProducts([]);
         setLoading(true);
         setError(null);
 

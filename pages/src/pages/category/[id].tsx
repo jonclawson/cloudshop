@@ -52,7 +52,7 @@ export default function CategoryPage() {
           {error ? <p className="text-sm text-red-600 mb-4">{error}</p> : null}
           {loading ? <p className="text-sm text-gray-600 mb-4">Loading category products...</p> : null}
 
-          <ProductsSection title="Printful Products" products={cards} />
+          {!loading ? <ProductsSection title="Printful Products" products={cards} /> : null}
         </div>
       </div>
     </div>
