@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useShoppingCart } from 'use-shopping-cart';
 import { useParams } from 'react-router-dom';
+import PrintStudio from 'printstudio';
+import 'printstudio/dist/printstudio.css';
 import { productsApi } from '../../useApi';
 import { useNavigate } from 'react-router-dom';
+import FullScreenDialog from '../../components/FullScreenDialog';
 type ProductVariant = {
   id: number | string;
   external_id?: string;
@@ -35,6 +38,7 @@ export default function ProductPage() {
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [mainImageSrc, setMainImageSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -78,6 +82,23 @@ export default function ProductPage() {
     () => Math.round((selectedVariant?.price ?? 0) * 100),
     [selectedVariant]
   );
+
+  const printStudioConfig = useMemo(() => {
+    // Placeholder config; we’ll wire real template + print-area later.
+    return {
+      template_width: 1000,
+      template_height: 1000,
+      print_area_width: 800,
+      print_area_height: 800,
+      print_area_top: 100,
+      print_area_left: 100,
+      image_url: mainImageSrc ?? '',
+      background_color: null,
+      printfile_width: 1000,
+      printfile_height: 1000,
+      printfile_dpi: 300,
+    };
+  }, [mainImageSrc]);
 
   const handleAddToCart = () => {
     if (!product || !selectedVariant) {
@@ -200,8 +221,24 @@ export default function ProductPage() {
             >
               Add to Cart
             </button>
+
+            <button
+              type="button"
+              onClick={() => setCustomizeOpen(true)}
+              className="w-full mt-3 bg-white text-black border-2 border-black py-3 rounded-md hover:bg-black hover:text-white transition cursor-pointer"
+            >
+              customize
+            </button>
           </div>
         </div>
+
+        <FullScreenDialog
+          open={customizeOpen}
+          onClose={() => setCustomizeOpen(false)}
+          title="Customize"
+        >
+          <PrintStudio config={printStudioConfig} />
+        </FullScreenDialog>
     </div>
   );
 }
