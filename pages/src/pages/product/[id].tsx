@@ -61,22 +61,23 @@ export default function ProductPage() {
 
   const displayName = product?.title || product?.name || 'Product';
   const [printFile, setPrintFile] = useState<File | null>(null);
-  const [printFileUrl, setPrintFileUrl] = useState<string | null>(null);
+  const [thumbFile, setThumbFile] = useState<File | null>(null);
+  const [thumbFileUrl, setThumbFileUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!printFileUrl) return;
+    if (!thumbFileUrl) return;
     return () => {
-      URL.revokeObjectURL(printFileUrl);
+      URL.revokeObjectURL(thumbFileUrl);
     };
-  }, [printFileUrl]);
+  }, [thumbFileUrl]);
 
   const allImages = useMemo(() => {
     const productImages = product?.images ?? [];
     const variantImages = selectedVariant?.images ?? [];
     const merged = [...productImages, ...variantImages];
-    if (printFileUrl) merged.unshift(printFileUrl);
+    if (thumbFileUrl) merged.unshift(thumbFileUrl);
     return merged.filter(Boolean);
-  }, [product?.images, selectedVariant?.images, printFileUrl]);
+  }, [product?.images, selectedVariant?.images, thumbFileUrl]);
 
   useEffect(() => {
     setMainImageSrc(allImages[0] ?? null);
@@ -102,9 +103,18 @@ export default function ProductPage() {
     // Store the exported file temporarily until "Add to Cart" is clicked.
     setPrintFile(file);
 
+    // Close the dialog + show the exported image immediately.
+    setCustomizeOpen(false);
+
+  };
+
+  const handlePrintStudioSaveThumb = async (file: File) => {
+    // Store the exported file temporarily until "Add to Cart" is clicked.
+    setThumbFile(file);
+
     const nextUrl = URL.createObjectURL(file);
 
-    setPrintFileUrl((prevUrl) => {
+    setThumbFileUrl((prevUrl) => {
       if (prevUrl) URL.revokeObjectURL(prevUrl);
       return nextUrl;
     });
@@ -162,9 +172,9 @@ export default function ProductPage() {
     if (printFile) {
       setPrintFile(null);
     }
-    if (printFileUrl && printFile) {
-      URL.revokeObjectURL(printFileUrl);
-      setPrintFileUrl(null);
+    if (thumbFileUrl && thumbFile) {
+      URL.revokeObjectURL(thumbFileUrl);
+      setThumbFileUrl(null);
     }
 
     addItem({
@@ -312,6 +322,7 @@ export default function ProductPage() {
               config={{
                 ...printStudioConfig,
                 onExportComplete: handlePrintStudioExportComplete,
+                onSaveThumb: handlePrintStudioSaveThumb,
               }}
             />
           )}
