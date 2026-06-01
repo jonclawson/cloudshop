@@ -4,7 +4,7 @@ import { useShoppingCart } from 'use-shopping-cart';
 import { useParams } from 'react-router-dom';
 import PrintStudio from 'printstudio';
 import 'printstudio/dist/printstudio.css';
-import { productsApi } from '../../useApi';
+import { productsApi, templatesApi, type PrintstudioTemplateConfig } from '../../useApi';
 import { useNavigate } from 'react-router-dom';
 import FullScreenDialog from '../../components/FullScreenDialog';
 type ProductVariant = {
@@ -83,22 +83,46 @@ export default function ProductPage() {
     [selectedVariant]
   );
 
-  const printStudioConfig = useMemo(() => {
-    // Placeholder config; we’ll wire real template + print-area later.
-    return {
-      template_width: 1000,
-      template_height: 1000,
-      print_area_width: 800,
-      print_area_height: 800,
-      print_area_top: 100,
-      print_area_left: 100,
-      image_url: mainImageSrc ?? '',
-      background_color: null,
-      printfile_width: 1000,
-      printfile_height: 1000,
-      printfile_dpi: 300,
+  const [printStudioConfig, setPrintStudioConfig] = useState<PrintstudioTemplateConfig | null>(null);
+  const [printStudioLoading, setPrintStudioLoading] = useState(false);
+  const [printStudioError, setPrintStudioError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchTemplateConfig = async () => {
+      if (!customizeOpen) return;
+      if (!selectedVariant) return;
+      if (!id) return;
+
+      let cancelled = false;
+
+      setPrintStudioLoading(true);
+      setPrintStudioError(null);
+      setPrintStudioConfig(null);
+
+      try {
+        const response = await templatesApi.getPrintstudioTemplateConfig(id, selectedVariant.id);
+        if (!cancelled) {
+          setPrintStudioConfig(response.data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to load printstudio template config:', err);
+          setPrintStudioError('Failed to load print studio configuration.');
+          setPrintStudioConfig(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setPrintStudioLoading(false);
+        }
+      }
+
+      return () => {
+        cancelled = true;
+      };
     };
-  }, [mainImageSrc]);
+
+    void fetchTemplateConfig();
+  }, [customizeOpen, id, selectedVariant?.id]);
 
   const handleAddToCart = () => {
     if (!product || !selectedVariant) {
@@ -237,7 +261,17 @@ export default function ProductPage() {
           onClose={() => setCustomizeOpen(false)}
           title="Customize"
         >
-          <PrintStudio config={printStudioConfig} />
+          {printStudioLoading || !printStudioConfig ? (
+            <div className="p-6">
+              {printStudioError ? (
+                <div className="text-red-600">{printStudioError}</div>
+              ) : (
+                <div>Loading print studio...</div>
+              )}
+            </div>
+          ) : (
+            <PrintStudio config={printStudioConfig} />
+          )}
         </FullScreenDialog>
     </div>
   );

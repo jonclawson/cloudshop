@@ -256,6 +256,22 @@ export const authApi = {
     }),
 };
 
+export type PrintstudioTemplateConfig = {
+  template_width: number;
+  template_height: number;
+  print_area_width: number;
+  print_area_height: number;
+  print_area_top: number;
+  print_area_left: number;
+
+  image_url: string;
+  background_color?: string | null;
+
+  printfile_width: number;
+  printfile_height: number;
+  printfile_dpi: number;
+};
+
 export const productsApi = {
   getAll: (provider?: 'printful', categoryId?: string) => {
     const params: string[] = [];
@@ -268,6 +284,13 @@ export const productsApi = {
   },
 
   getById: (id: string) => sendRequest<unknown>(`/api/products/${id}`),
+};
+
+export const templatesApi = {
+  getPrintstudioTemplateConfig: (productId: string, variantId?: string | number) => {
+    const query = variantId !== undefined ? `?variant_id=${encodeURIComponent(String(variantId))}` : '';
+    return sendRequest<PrintstudioTemplateConfig>(`/api/products/${encodeURIComponent(productId)}/template${query}`);
+  },
 };
 
 export const ordersApi = {

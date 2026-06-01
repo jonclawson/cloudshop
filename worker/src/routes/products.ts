@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { getDb, schema } from '../db';
-import { getPrintfulProductById, getPrintfulProducts, type PrintfulProductResponse } from '../services/printful';
+import { getPrintfulProductById, getPrintfulProducts, getPrintstudioTemplateConfig, type PrintfulProductResponse } from '../services/printful';
 
 type Bindings = {
   DB: D1Database;
@@ -300,6 +300,23 @@ products.get('/:id', async (c) => {
     }
   } catch (error) {
     return c.json({ error: 'Failed to fetch product' }, 500);
+  }
+});
+
+products.get('/:id/template', async (c) => {
+  const id = c.req.param('id');
+  const variantId = c.req.query('variant_id');
+
+  try {
+    const config = await getPrintstudioTemplateConfig(
+      c,
+      id,
+      variantId ? { variantId } : undefined
+    );
+    return c.json(config);
+  } catch (err) {
+    console.error('Failed to fetch printstudio template config:', err);
+    return c.json({ error: 'Failed to fetch printstudio template config' }, 500);
   }
 });
 

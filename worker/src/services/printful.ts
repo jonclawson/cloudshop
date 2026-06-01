@@ -475,3 +475,198 @@ export async function getPrintfulProductById(c: { env: PrintfulEnv }, id: string
     return products.find((p) => p.id === id || p.external_id === id) ?? null;
   }
 }
+
+export type PrintstudioTemplateConfig = {
+  template_width: number;
+  template_height: number;
+  print_area_width: number;
+  print_area_height: number;
+  print_area_top: number;
+  print_area_left: number;
+
+  image_url: string;
+  background_color?: string | null;
+
+  /**
+   * Target export dimensions (from api/mockup-generator/printfiles/*)
+   */
+  printfile_width: number;
+  printfile_height: number;
+  printfile_dpi: number;
+};
+
+type PrintfulMockupTemplate = {
+  catalog_variant_ids?: number[];
+  placement?: string;
+  technique?: string;
+  image_url?: string;
+  background_url?: string | null;
+  background_color?: string | null;
+
+  printfile_id: number;
+
+  template_width: number;
+  template_height: number;
+
+  print_area_width: number;
+  print_area_height: number;
+  print_area_top: number;
+  print_area_left: number;
+
+  template_positioning?: string;
+  orientation?: string;
+  template_type?: string | null;
+  role?: string;
+};
+
+type PrintfulPrintfile = {
+  printfile_id: number;
+  width: number;
+  height: number;
+  dpi: number;
+  fill_mode?: string;
+  can_rotate?: boolean;
+};
+
+function getFirstDefined<T>(value: T | null | undefined, fallback: T): T {
+  return value ?? fallback;
+}
+
+function pickPrintfulMockupTemplate(templates: PrintfulMockupTemplate[], opts?: { variantId?: string }): PrintfulMockupTemplate {
+  if (templates.length === 0) {
+    throw new Error('PRINTFUL_MOCKUP_TEMPLATES_EMPTY');
+  }
+
+  const variantNum = opts?.variantId ? Number.parseInt(opts.variantId, 10) : NaN;
+
+  if (Number.isFinite(variantNum)) {
+    const matchedByVariant = templates.find((t) => Array.isArray(t.catalog_variant_ids) && t.catalog_variant_ids.includes(variantNum));
+    if (matchedByVariant) return matchedByVariant;
+  }
+
+  const matchedPrimaryFront = templates.find((t) => t.role === 'primary' && t.placement === 'front');
+  if (matchedPrimaryFront) return matchedPrimaryFront;
+
+  const matchedPrimary = templates.find((t) => t.role === 'primary');
+  if (matchedPrimary) return matchedPrimary;
+
+  const matchedFront = templates.find((t) => t.placement === 'front');
+  if (matchedFront) return matchedFront;
+
+  return templates[0];
+}
+
+function mapToPrintstudioTemplateConfig(template: PrintfulMockupTemplate, printfiles: PrintfulPrintfile[]): PrintstudioTemplateConfig {
+  const printfileId = template.printfile_id;
+  const matchedPrintfile =
+    printfiles.find((pf) => Number(pf.printfile_id) === Number(printfileId)) ?? printfiles[0];
+
+  if (!matchedPrintfile) {
+    throw new Error('PRINTFUL_PRINTFILES_EMPTY');
+  }
+
+  const image_url = getFirstDefined(template.image_url ?? null, '');
+  if (!image_url) {
+    throw new Error('PRINTFUL_TEMPLATE_MISSING_IMAGE_URL');
+  }
+
+  return {
+    template_width: template.template_width,
+    template_height: template.template_height,
+
+    print_area_width: template.print_area_width,
+    print_area_height: template.print_area_height,
+    print_area_top: template.print_area_top,
+    print_area_left: template.print_area_left,
+
+    image_url,
+    background_color: template.background_color ?? null,
+
+    printfile_width: matchedPrintfile.width,
+    printfile_height: matchedPrintfile.height,
+    printfile_dpi: matchedPrintfile.dpi,
+  };
+}
+
+export async function getPrintfulMockupTemplates(c: { env: PrintfulEnv }, catalogProductId: string): Promise<PrintfulMockupTemplate[]> {
+  const apiKey = c.env.PRINTFUL_API_KEY;
+  if (!apiKey) throw new Error('MISSING_PRINTFUL_API_KEY');
+
+  const url = new URL(`https://api.printful.com/v2/catalog-products/${encodeURIComponent(catalogProductId)}/mockup-templates`);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`PRINTFUL_MOCKUP_TEMPLATES_FAILED:${response.status}:${text.slice(0, 200)}`);
+  }
+
+  const body = (await response.json()) as { data?: unknown };
+  const rawData = body.data;
+
+  if (!Array.isArray(rawData)) return [];
+
+  const templates: PrintfulMockupTemplate[] = rawData
+    .filter((t) => typeof t === 'object' && t !== null)
+    .map((t) => t as unknown as PrintfulMockupTemplate)
+    .filter((t) => typeof t.printfile_id === 'number');
+
+  return templates;
+}
+
+export async function getPrintfulMockupGeneratorPrintfiles(
+  c: { env: PrintfulEnv },
+  catalogProductId: string
+): Promise<PrintfulPrintfile[]> {
+  const apiKey = c.env.PRINTFUL_API_KEY;
+  if (!apiKey) throw new Error('MISSING_PRINTFUL_API_KEY');
+
+  const url = new URL(`https://api.printful.com/mockup-generator/printfiles/${encodeURIComponent(catalogProductId)}`);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`PRINTFUL_PRINTFILES_FAILED:${response.status}:${text.slice(0, 200)}`);
+  }
+
+  const body = (await response.json()) as unknown;
+
+  const result = (body as any)?.result ?? body;
+  const printfilesRaw = (result as any)?.printfiles;
+
+  if (!Array.isArray(printfilesRaw)) return [];
+
+  const printfiles: PrintfulPrintfile[] = printfilesRaw
+    .filter((pf) => typeof pf === 'object' && pf !== null)
+    .map((pf) => pf as unknown as PrintfulPrintfile)
+    .filter((pf) => typeof pf.printfile_id === 'number');
+
+  return printfiles;
+}
+
+export async function getPrintstudioTemplateConfig(
+  c: { env: PrintfulEnv },
+  catalogProductId: string,
+  opts?: { variantId?: string }
+): Promise<PrintstudioTemplateConfig> {
+  const [templates, printfiles] = await Promise.all([
+    getPrintfulMockupTemplates(c, catalogProductId),
+    getPrintfulMockupGeneratorPrintfiles(c, catalogProductId),
+  ]);
+
+  const template = pickPrintfulMockupTemplate(templates, opts);
+  return mapToPrintstudioTemplateConfig(template, printfiles);
+}
