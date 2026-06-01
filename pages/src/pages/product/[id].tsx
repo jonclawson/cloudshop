@@ -60,12 +60,23 @@ export default function ProductPage() {
   }, [id]);
 
   const displayName = product?.title || product?.name || 'Product';
+  const [printFile, setPrintFile] = useState<File | null>(null);
+  const [printFileUrl, setPrintFileUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!printFileUrl) return;
+    return () => {
+      URL.revokeObjectURL(printFileUrl);
+    };
+  }, [printFileUrl]);
+
   const allImages = useMemo(() => {
     const productImages = product?.images ?? [];
     const variantImages = selectedVariant?.images ?? [];
-    const merged = [...productImages, ...variantImages].filter(Boolean);
-    return merged;
-  }, [product?.images, selectedVariant?.images]);
+    const merged = [...productImages, ...variantImages];
+    if (printFileUrl) merged.unshift(printFileUrl);
+    return merged.filter(Boolean);
+  }, [product?.images, selectedVariant?.images, printFileUrl]);
 
   useEffect(() => {
     setMainImageSrc(allImages[0] ?? null);
@@ -86,6 +97,22 @@ export default function ProductPage() {
   const [printStudioConfig, setPrintStudioConfig] = useState<PrintstudioTemplateConfig | null>(null);
   const [printStudioLoading, setPrintStudioLoading] = useState(false);
   const [printStudioError, setPrintStudioError] = useState<string | null>(null);
+
+  const handlePrintStudioExportComplete = async (file: File) => {
+    // Store the exported file temporarily until "Add to Cart" is clicked.
+    setPrintFile(file);
+
+    const nextUrl = URL.createObjectURL(file);
+
+    setPrintFileUrl((prevUrl) => {
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
+      return nextUrl;
+    });
+
+    // Close the dialog + show the exported image immediately.
+    setCustomizeOpen(false);
+    setMainImageSrc(nextUrl);
+  };
 
   useEffect(() => {
     const fetchTemplateConfig = async () => {
@@ -127,6 +154,17 @@ export default function ProductPage() {
   const handleAddToCart = () => {
     if (!product || !selectedVariant) {
       return;
+    }
+
+    // "Until the product is added to cart": clear the temporary export once added.
+    // (Navigation away from this page will also drop state, but this keeps intent explicit.)
+    // Note: we are not uploading/attaching to cart in this task.
+    if (printFile) {
+      setPrintFile(null);
+    }
+    if (printFileUrl && printFile) {
+      URL.revokeObjectURL(printFileUrl);
+      setPrintFileUrl(null);
     }
 
     addItem({
@@ -270,7 +308,12 @@ export default function ProductPage() {
               )}
             </div>
           ) : (
-            <PrintStudio config={printStudioConfig} />
+            <PrintStudio
+              config={{
+                ...printStudioConfig,
+                onExportComplete: handlePrintStudioExportComplete,
+              }}
+            />
           )}
         </FullScreenDialog>
     </div>
