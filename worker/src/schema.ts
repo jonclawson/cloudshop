@@ -80,9 +80,28 @@ export const orderItems = sqliteTable('order_items', {
   product_variant_id: text('product_variant_id').notNull(),
   quantity: integer('quantity').notNull(),
   price_at_purchase: real('price_at_purchase').notNull(),
-  user_upload_id: text('user_upload_id'), // design applied to this item
   created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const orderItemUploads = sqliteTable(
+  'order_item_uploads',
+  {
+    id: text('id').primaryKey().default('uuid()'),
+    order_item_id: text('order_item_id').notNull(),
+    user_upload_id: text('user_upload_id').notNull(),
+    created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => {
+    return [
+      index('order_item_uploads_order_item_id_index').on(table.order_item_id),
+      index('order_item_uploads_user_upload_id_index').on(table.user_upload_id),
+      uniqueIndex('order_item_uploads_order_item_id_user_upload_id_unique').on(
+        table.order_item_id,
+        table.user_upload_id
+      ),
+    ];
+  }
+);
 
 // User uploads (design files)
 export const userUploads = sqliteTable('user_uploads', {
