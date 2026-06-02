@@ -65,6 +65,26 @@ export async function putPrintFile(assetKey: string, printBlob: Blob): Promise<v
   });
 }
 
+export async function getPrintFileBlob(assetKey: string): Promise<Blob | null> {
+  if (!assetKey) return null;
+
+  const record = await withStore<PrintAssetRecord | null>('readonly', async (store) => {
+    await new Promise<void>((resolve) => {
+      // placeholder
+      if (!store) return resolve();
+      resolve();
+    });
+
+    return new Promise<PrintAssetRecord | null>((resolve, reject) => {
+      const req = store.get(assetKey);
+      req.onsuccess = () => resolve((req.result as PrintAssetRecord | undefined) ?? null);
+      req.onerror = () => reject(req.error);
+    });
+  });
+
+  return record?.printBlob ?? null;
+}
+
 export async function deletePrintAssets(keys: string | string[]): Promise<void> {
   const list = Array.isArray(keys) ? keys : [keys];
   const unique = Array.from(new Set(list.filter((k): k is string => Boolean(k))));

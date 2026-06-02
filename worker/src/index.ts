@@ -4,6 +4,7 @@ import authRoutes from './routes/auth';
 import productsRoutes from './routes/products';
 import ordersRoutes from './routes/orders';
 import uploadsRoutes from './routes/uploads';
+import imageProxyRoutes from './routes/imageProxy';
 import adminRoutes from './routes/admin';
 import categoriesRoutes from './routes/categories';
 import { getDb, schema } from './db';
@@ -70,6 +71,7 @@ app.route('/api/products', productsRoutes);
 app.route('/api/categories', categoriesRoutes);
 app.route('/api/orders', ordersRoutes);
 app.route('/api/uploads', uploadsRoutes);
+app.route('/api/image-proxy', imageProxyRoutes);
 app.route('/api/admin', adminRoutes);
 
 // Health check

@@ -301,6 +301,20 @@ export const ordersApi = {
       body: { items, shipping_address: shippingAddress, email },
     }),
 
+  linkOrderItemUploads: (
+    orderId: string,
+    links: Array<{
+      order_item_id: string;
+      thumb_user_upload_id?: string;
+      print_user_upload_id?: string;
+    }>
+  ) =>
+    sendRequest<unknown>(`/api/orders/${orderId}/order-item-uploads`, {
+      method: 'POST',
+      auth: true,
+      body: links,
+    }),
+
   getAll: () =>
     sendRequest<{ orders?: unknown[] }>(`/api/orders`, {
       auth: true,
