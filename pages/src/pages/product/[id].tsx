@@ -228,7 +228,7 @@ export default function ProductPage() {
     const printAssetKey = await addPrintFileToIndexedDbAndRegister();
 
     addItem({
-      id: String(selectedVariant.external_id ?? selectedVariant.id),
+      id: String(selectedVariant.external_id ?? selectedVariant.id) + (printAssetKey ? `-${printAssetKey}` : ''),
       name: `${displayName} - ${
         selectedVariant.title || selectedVariant.size || selectedVariant.color || 'Default'
       }`,
