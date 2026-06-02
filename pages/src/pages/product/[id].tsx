@@ -68,10 +68,9 @@ export default function ProductPage() {
   }, [thumbFileUrl]);
 
   const allImages = useMemo(() => {
-    // const productImages = product?.images ?? [];
+    const productImages = product?.images ?? [];
     const variantImages = selectedVariant?.images ?? [];
-    // const merged = [...productImages, ...variantImages];
-    const merged = [ ...variantImages];
+    const merged = [...(variantImages.length === 0 ? productImages : []), ...variantImages];
 
     if (thumbFileUrl) merged.unshift(thumbFileUrl);
 
