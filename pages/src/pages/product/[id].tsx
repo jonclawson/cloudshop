@@ -90,7 +90,20 @@ export default function ProductPage() {
         setProduct(nextProduct);
 
         if (nextProduct.variants && nextProduct.variants.length > 0) {
-          setSelectedVariant(nextProduct.variants[0]);
+          const variants = nextProduct.variants;
+
+          const mediumBySize =
+            variants.find((v) => typeof v.size === 'string' && v.size.toUpperCase() === 'M') ??
+            null;
+
+          const mediumByTitle =
+            variants.find((v) =>
+              typeof v.title === 'string'
+                ? v.title.toLowerCase().includes('medium')
+                : false
+            ) ?? null;
+
+          setSelectedVariant(mediumBySize ?? mediumByTitle ?? variants[0]);
         }
       } catch (error) {
         console.error('Failed to fetch product:', error);
