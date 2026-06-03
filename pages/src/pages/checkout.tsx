@@ -258,6 +258,70 @@ export default function CheckoutPage() {
             </div>
           )}
 
+          
+        </div>
+
+        <div className="rounded-md border border-gray-200 bg-white p-4">
+          <div className="font-semibold mb-2">Checkout details</div>
+          <div className="text-sm text-gray-600 mb-3">
+            Stripe forms are displayed (billing/shipping/payment UI only). No payment is processed yet.
+          </div>
+
+          {!stripePublishableKey && (
+            <div className="rounded-md border border-dashed border-gray-300 p-4">
+              <div className="text-sm text-gray-600">
+                Missing <span className="font-semibold">VITE_STRIPE_PUBLISHABLE_KEY</span>. Stripe UI can’t render.
+              </div>
+            </div>
+          )}
+
+          {stripePublishableKey && (
+            <div className="space-y-4">
+              {stripeUiError && (
+                <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  {stripeUiError}
+                </div>
+              )}
+
+              {!stripeUiLoading && stripeClientSecret && stripePromise && (
+                <Elements stripe={stripePromise} options={{ clientSecret: stripeClientSecret }}>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold">Billing address</div>
+                      <AddressElement options={{ mode: 'billing', allowedCountries: ['US', 'CA'] }} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold">Shipping address</div>
+                      <AddressElement options={{ mode: 'shipping', allowedCountries: ['US', 'CA'] }} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold">Payment info</div>
+                      <PaymentElement options={{ layout: 'tabs' }} />
+                    </div>
+                  </div>
+                </Elements>
+              )}
+
+              {stripeUiLoading && (
+                <div className="rounded-md border border-dashed border-gray-300 p-4">
+                  <div className="text-sm text-gray-600">Loading Stripe UI…</div>
+                </div>
+              )}
+
+              {stripeUiError === '' && !stripeUiLoading && !stripeClientSecret && (
+                <div className="rounded-md border border-dashed border-gray-300 p-4">
+                  <div className="text-sm text-gray-600">
+                    Enter a valid email to load the Stripe forms.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="p-4">
           <button
             disabled={processing || items.length === 0 || !emailValid}
             onClick={async () => {
@@ -417,65 +481,6 @@ export default function CheckoutPage() {
           </button>
         </div>
 
-        <div className="rounded-md border border-gray-200 bg-white p-4">
-          <div className="font-semibold mb-2">Checkout details</div>
-          <div className="text-sm text-gray-600 mb-3">
-            Stripe forms are displayed (billing/shipping/payment UI only). No payment is processed yet.
-          </div>
-
-          {!stripePublishableKey && (
-            <div className="rounded-md border border-dashed border-gray-300 p-4">
-              <div className="text-sm text-gray-600">
-                Missing <span className="font-semibold">VITE_STRIPE_PUBLISHABLE_KEY</span>. Stripe UI can’t render.
-              </div>
-            </div>
-          )}
-
-          {stripePublishableKey && (
-            <div className="space-y-4">
-              {stripeUiError && (
-                <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-                  {stripeUiError}
-                </div>
-              )}
-
-              {!stripeUiLoading && stripeClientSecret && stripePromise && (
-                <Elements stripe={stripePromise} options={{ clientSecret: stripeClientSecret }}>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="text-sm font-semibold">Billing address</div>
-                      <AddressElement options={{ mode: 'billing', allowedCountries: ['US', 'CA'] }} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="text-sm font-semibold">Shipping address</div>
-                      <AddressElement options={{ mode: 'shipping', allowedCountries: ['US', 'CA'] }} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="text-sm font-semibold">Payment info</div>
-                      <PaymentElement options={{ layout: 'tabs' }} />
-                    </div>
-                  </div>
-                </Elements>
-              )}
-
-              {stripeUiLoading && (
-                <div className="rounded-md border border-dashed border-gray-300 p-4">
-                  <div className="text-sm text-gray-600">Loading Stripe UI…</div>
-                </div>
-              )}
-
-              {stripeUiError === '' && !stripeUiLoading && !stripeClientSecret && (
-                <div className="rounded-md border border-dashed border-gray-300 p-4">
-                  <div className="text-sm text-gray-600">
-                    Enter a valid email to load the Stripe forms.
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
