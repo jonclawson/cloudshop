@@ -355,7 +355,7 @@ export default function ProductPage() {
           >
             Add to Cart
           </button>
-
+          {product.provider === 'printful' && (
           <button
             type="button"
             onClick={() => {
@@ -367,6 +367,7 @@ export default function ProductPage() {
           >
             customize
           </button>
+          )}
         </div>
       </div>
 
