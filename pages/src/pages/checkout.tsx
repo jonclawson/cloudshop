@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { loadStripe } from '@stripe/stripe-js';
+import { AddressElement, Elements, PaymentElement } from '@stripe/react-stripe-js';
+
 import { useAuth } from '../AuthContext';
 import { ordersApi, uploadsApi } from '../useApi';
 import { useShoppingCart } from 'use-shopping-cart';
@@ -21,23 +24,6 @@ type CartLineWithUploads = CartLine & {
   image?: string; // thumb data URL (from product page)
   printAssetKey?: string; // IDB key for print file
 };
-
-function StripePaymentStub() {
-  return (
-    <div className="rounded-md border border-gray-200 bg-white p-4">
-      <div className="font-semibold mb-2">Stripe Payment</div>
-      <div className="text-sm text-gray-600 mb-3">
-        Stripe UI is wired-ready, but not functional yet (Stripe account/keys still pending).
-      </div>
-
-      <div className="rounded-md border border-dashed border-gray-300 p-4">
-        <div className="text-sm text-gray-600">
-          Payment form will be embedded here when Stripe is connected.
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -97,6 +83,35 @@ async function dataUrlToResizedBlob(
   return blob;
 }
 
+async function createPaymentIntentUiClientSecret(params: {
+  amountCents: number;
+  currency: string;
+  receiptEmail: string;
+}): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/api/stripe/payment-intent-ui`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      amount: params.amountCents,
+      currency: params.currency,
+      receipt_email: params.receiptEmail,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Failed to create Stripe UI intent (${response.status}): ${text || response.statusText}`);
+  }
+
+  const data = (await response.json()) as { client_secret?: string };
+  if (!data.client_secret) {
+    throw new Error('Stripe returned missing client_secret');
+  }
+  return data.client_secret;
+}
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
@@ -129,6 +144,60 @@ export default function CheckoutPage() {
   }, [items]);
 
   const emailValid = isValidEmail(email);
+
+  const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
+
+  const stripePromise = useMemo(() => {
+    if (!stripePublishableKey) return null;
+    return loadStripe(stripePublishableKey);
+  }, [stripePublishableKey]);
+
+  const totalAmountCents = useMemo(() => {
+    return items.reduce((sum, line) => sum + line.price * line.quantity, 0);
+  }, [items]);
+
+  const currency = useMemo(() => {
+    return items[0]?.currency ?? 'usd';
+  }, [items]);
+
+  const [stripeClientSecret, setStripeClientSecret] = useState<string>('');
+  const [stripeUiError, setStripeUiError] = useState<string>('');
+  const [stripeUiLoading, setStripeUiLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async (): Promise<void> => {
+      if (!stripePublishableKey) return;
+      if (!emailValid) return;
+      if (items.length === 0) return;
+      if (!Number.isFinite(totalAmountCents) || totalAmountCents <= 0) return;
+
+      setStripeUiError('');
+      setStripeUiLoading(true);
+
+      try {
+        const clientSecret = await createPaymentIntentUiClientSecret({
+          amountCents: totalAmountCents,
+          currency: currency.toLowerCase(),
+          receiptEmail: email.trim(),
+        });
+
+        if (!cancelled) setStripeClientSecret(clientSecret);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : 'Failed to load Stripe UI';
+        if (!cancelled) setStripeUiError(message);
+      } finally {
+        if (!cancelled) setStripeUiLoading(false);
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stripePublishableKey, emailValid, email, items.length, totalAmountCents, currency]);
 
   return (
     <div className="main-class">
@@ -348,7 +417,65 @@ export default function CheckoutPage() {
           </button>
         </div>
 
-        <StripePaymentStub />
+        <div className="rounded-md border border-gray-200 bg-white p-4">
+          <div className="font-semibold mb-2">Checkout details</div>
+          <div className="text-sm text-gray-600 mb-3">
+            Stripe forms are displayed (billing/shipping/payment UI only). No payment is processed yet.
+          </div>
+
+          {!stripePublishableKey && (
+            <div className="rounded-md border border-dashed border-gray-300 p-4">
+              <div className="text-sm text-gray-600">
+                Missing <span className="font-semibold">VITE_STRIPE_PUBLISHABLE_KEY</span>. Stripe UI can’t render.
+              </div>
+            </div>
+          )}
+
+          {stripePublishableKey && (
+            <div className="space-y-4">
+              {stripeUiError && (
+                <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  {stripeUiError}
+                </div>
+              )}
+
+              {!stripeUiLoading && stripeClientSecret && stripePromise && (
+                <Elements stripe={stripePromise} options={{ clientSecret: stripeClientSecret }}>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold">Billing address</div>
+                      <AddressElement options={{ mode: 'billing', allowedCountries: ['US', 'CA'] }} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold">Shipping address</div>
+                      <AddressElement options={{ mode: 'shipping', allowedCountries: ['US', 'CA'] }} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold">Payment info</div>
+                      <PaymentElement options={{ layout: 'tabs' }} />
+                    </div>
+                  </div>
+                </Elements>
+              )}
+
+              {stripeUiLoading && (
+                <div className="rounded-md border border-dashed border-gray-300 p-4">
+                  <div className="text-sm text-gray-600">Loading Stripe UI…</div>
+                </div>
+              )}
+
+              {stripeUiError === '' && !stripeUiLoading && !stripeClientSecret && (
+                <div className="rounded-md border border-dashed border-gray-300 p-4">
+                  <div className="text-sm text-gray-600">
+                    Enter a valid email to load the Stripe forms.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

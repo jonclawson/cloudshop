@@ -25,10 +25,12 @@ services:
       - .:/app
     ports:
       - "5173:5173"
-    environment:
-      NODE_ENV: development
-      VITE_USE_MOCKS: "true"
-      VITE_API_BASE_URL: http://localhost:8787
+    env_file:
+      - .env.development
+    # environment:
+    #   NODE_ENV: development
+    #   VITE_USE_MOCKS: "true"
+    #   VITE_API_BASE_URL: http://localhost:8787
     command: >
       sh -c "npm install && npm run dev"
     networks:

@@ -7,6 +7,7 @@ import uploadsRoutes from './routes/uploads';
 import imageProxyRoutes from './routes/imageProxy';
 import adminRoutes from './routes/admin';
 import categoriesRoutes from './routes/categories';
+import stripeRoutes from './routes/stripe';
 import { getDb, schema } from './db';
 import { eq } from 'drizzle-orm';
 import { hashPassword } from './services/authUtils';
@@ -16,6 +17,7 @@ export type CloudshopEnv = {
   JWT_SECRET?: string;
   ENVIRONMENT?: string;
   USE_MOCKS?: string;
+  STRIPE_SECRET_KEY?: string;
 };
 
 type Bindings = CloudshopEnv;
@@ -72,6 +74,7 @@ app.route('/api/categories', categoriesRoutes);
 app.route('/api/orders', ordersRoutes);
 app.route('/api/uploads', uploadsRoutes);
 app.route('/api/image-proxy', imageProxyRoutes);
+app.route('/api/stripe', stripeRoutes);
 app.route('/api/admin', adminRoutes);
 
 // Health check
