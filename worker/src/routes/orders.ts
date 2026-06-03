@@ -532,6 +532,7 @@ orders.get('/:id', verifyJWT, async (c) => {
 
     // More reliable size/color: fetch per-variant from Printful's variant endpoint.
     let printfulVariantSizeColorIndex: Map<string, { size: string | null; color: string | null }> = new Map();
+    let printfulVariantImageUrlByVariantId: Map<string, string> = new Map();
 
     if (needsPrintfulHydration) {
       const printfulProducts = await getPrintfulProducts(
@@ -544,12 +545,19 @@ orders.get('/:id', verifyJWT, async (c) => {
         const productSku = String(prod.external_id ?? prod.id);
 
         for (const v of prod.variants ?? []) {
-          printfulVariantIndex.set(String(v.id), {
+          const vid = String(v.id);
+
+          printfulVariantIndex.set(vid, {
             productTitle,
             productSku,
             size: v.size ?? null,
             color: v.color ?? null,
           });
+
+          const variantImageUrl = (v.images?.[0] ?? prod.images?.[0]) ?? null;
+          if (variantImageUrl) {
+            printfulVariantImageUrlByVariantId.set(vid, String(variantImageUrl));
+          }
         }
       }
 
@@ -572,6 +580,10 @@ orders.get('/:id', verifyJWT, async (c) => {
               size: v.size ?? null,
               color: v.color ?? null,
             });
+
+            if (v.imageUrl) {
+              printfulVariantImageUrlByVariantId.set(variantId, String(v.imageUrl));
+            }
           } catch {
             // Keep missing entries; mapping will fall back to list-based values.
           }
@@ -606,7 +618,8 @@ orders.get('/:id', verifyJWT, async (c) => {
             color: sc?.color ?? idx?.color ?? row.color ?? null,
 
             thumb_url: thumbUrl,
-            variant_image_url: variantImageUrl,
+            variant_image_url:
+              variantImageUrl ?? printfulVariantImageUrlByVariantId.get(vid) ?? null,
           };
         }
 

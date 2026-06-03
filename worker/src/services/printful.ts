@@ -376,11 +376,13 @@ export async function getPrintfulVariantById(c: { env: PrintfulEnv }, id: string
 
   const size = asString(variant.size) ?? null;
   const color = asString(variant.color) ?? null;
+  const imageUrl = asString(variant.image) ?? null;
 
   return {
     id: asString(variant.id) ?? id,
     size,
     color,
+    imageUrl,
   };
 }
 
