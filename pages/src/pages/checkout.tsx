@@ -112,6 +112,16 @@ async function createPaymentIntentUiClientSecret(params: {
   return data.client_secret;
 }
 
+type AddressInput = {
+  name?: string;
+  line1?: string;
+  line2?: string | null;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+};
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
@@ -121,6 +131,9 @@ export default function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string>('');
   const [email, setEmail] = useState<string>(user?.email ?? '');
+
+  const [billingAddress, setBillingAddress] = useState<AddressInput | null>(null);
+  const [shippingAddress, setShippingAddress] = useState<AddressInput | null>(null);
 
   useEffect(() => {
     if (user?.email) {
@@ -288,12 +301,42 @@ export default function CheckoutPage() {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <div className="text-sm font-semibold">Billing address</div>
-                      <AddressElement options={{ mode: 'billing', allowedCountries: ['US', 'CA'] }} />
+                      <AddressElement
+                        options={{ mode: 'billing', allowedCountries: ['US', 'CA'] }}
+                        onChange={(e) => {
+                          if (e.complete) {
+                            setBillingAddress({
+                              name: e.value.name,
+                              line1: e.value.address.line1,
+                              line2: e.value.address.line2 ?? null,
+                              city: e.value.address.city,
+                              state: e.value.address.state,
+                              postal_code: e.value.address.postal_code,
+                              country: e.value.address.country,
+                            });
+                          }
+                        }}
+                      />
                     </div>
 
                     <div className="space-y-2">
                       <div className="text-sm font-semibold">Shipping address</div>
-                      <AddressElement options={{ mode: 'shipping', allowedCountries: ['US', 'CA'] }} />
+                      <AddressElement
+                        options={{ mode: 'shipping', allowedCountries: ['US', 'CA'] }}
+                        onChange={(e) => {
+                          if (e.complete) {
+                            setShippingAddress({
+                              name: e.value.name,
+                              line1: e.value.address.line1,
+                              line2: e.value.address.line2 ?? null,
+                              city: e.value.address.city,
+                              state: e.value.address.state,
+                              postal_code: e.value.address.postal_code,
+                              country: e.value.address.country,
+                            });
+                          }
+                        }}
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -329,7 +372,14 @@ export default function CheckoutPage() {
               setProcessing(true);
               try {
                 // 1) Create order + order_items first
-                const response = await ordersApi.create(orderSummaryLines, {}, email.trim());
+                const response = await ordersApi.create(
+                  orderSummaryLines,
+                  {
+                    billing_address: billingAddress ?? undefined,
+                    shipping_address: shippingAddress ?? undefined,
+                  },
+                  email.trim()
+                );
                 const data = response.data as {
                   order_id?: string;
                   order_item_ids?: string[];

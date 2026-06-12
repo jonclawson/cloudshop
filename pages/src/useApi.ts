@@ -293,12 +293,26 @@ export const templatesApi = {
   },
 };
 
+type AddressInput = {
+  name?: string;
+  line1?: string;
+  line2?: string | null;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+};
+
 export const ordersApi = {
-  create: (items: unknown[], shippingAddress: unknown, email: string) =>
+  create: (
+    items: unknown[],
+    addresses: { billing_address?: AddressInput; shipping_address?: AddressInput },
+    email: string
+  ) =>
     sendRequest<unknown>(`/api/orders`, {
       method: 'POST',
       auth: false,
-      body: { items, shipping_address: shippingAddress, email },
+      body: { items, email, ...addresses },
     }),
 
   linkOrderItemUploads: (

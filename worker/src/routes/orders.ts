@@ -32,10 +32,21 @@ type OrderRequestItem = {
   currency?: string;
 };
 
+type AddressInput = {
+  name?: string;
+  line1?: string;
+  line2?: string | null;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+};
+
 type CreateOrderBody = {
   items?: OrderRequestItem[];
-  shipping_address?: unknown;
   email?: string;
+  billing_address?: AddressInput;
+  shipping_address?: AddressInput;
 };
 
 function toMoneyDollarsFromCents(cents: number): number {
@@ -108,6 +119,62 @@ async function upsertUserByEmail(c: { env: Bindings; req: any }, email: string):
   });
 
   return userId;
+}
+
+async function findOrCreateAddress(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  addressInput: AddressInput
+): Promise<string> {
+  const { name, line1, line2, city, state, postal_code, country } = addressInput;
+
+  // Normalize: trim whitespace, lowercase country/state for consistent matching
+  const normalized = {
+    name: name?.trim() ?? null,
+    line1: line1?.trim() ?? null,
+    line2: line2?.trim() ?? null,
+    city: city?.trim() ?? null,
+    state: state?.trim() ?? null,
+    postal_code: postal_code?.trim() ?? null,
+    country: country?.trim()?.toLowerCase() ?? null,
+  };
+
+  // Look for an exact match for this user
+  const existing = await db
+    .select({ id: schema.addresses.id })
+    .from(schema.addresses)
+    .where(
+      and(
+        eq(schema.addresses.user_id, userId),
+        eq(schema.addresses.name, normalized.name),
+        eq(schema.addresses.line1, normalized.line1),
+        eq(schema.addresses.line2, normalized.line2),
+        eq(schema.addresses.city, normalized.city),
+        eq(schema.addresses.state, normalized.state),
+        eq(schema.addresses.postal_code, normalized.postal_code),
+        eq(schema.addresses.country, normalized.country)
+      )
+    )
+    .limit(1);
+
+  if (existing[0]) {
+    return existing[0].id;
+  }
+
+  const addressId = crypto.randomUUID();
+  await db.insert(schema.addresses).values({
+    id: addressId,
+    user_id: userId,
+    name: normalized.name,
+    line1: normalized.line1,
+    line2: normalized.line2,
+    city: normalized.city,
+    state: normalized.state,
+    postal_code: normalized.postal_code,
+    country: normalized.country,
+  });
+
+  return addressId;
 }
 
 orders.post('/', optionalAuth, async (c) => {
@@ -302,6 +369,25 @@ orders.post('/', optionalAuth, async (c) => {
       token_hash: refreshTokenHash,
       expires_at: expiresAt,
     });
+
+    // Persist billing and shipping addresses
+    const addressTypes: Array<{ key: keyof CreateOrderBody; type: string }> = [
+      { key: 'billing_address', type: 'billing' },
+      { key: 'shipping_address', type: 'shipping' },
+    ];
+
+    for (const { key, type } of addressTypes) {
+      const addrInput = body[key] as AddressInput | undefined;
+      if (addrInput && addrInput.line1 && addrInput.name) {
+        const addressId = await findOrCreateAddress(db, userId, addrInput);
+        await db.insert(schema.orderAddresses).values({
+          id: crypto.randomUUID(),
+          order_id: orderId,
+          address_id: addressId,
+          address_type: type,
+        });
+      }
+    }
 
     // Get email for response (handy for frontend AuthContext)
     const userRow = await db

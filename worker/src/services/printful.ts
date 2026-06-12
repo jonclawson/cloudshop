@@ -79,7 +79,7 @@ function normalizeMarkdownDescription(value: string | undefined): string | null 
   // Printful sometimes sends literal "\n" sequences; convert them to real newlines.
   // Also normalize CRLF -> LF.
   const withNewlines = value.replace(/•/g, '- ');
-  console.log('Normalized description:', { original: value, withNewlines });
+  // console.log('Normalized description:', { original: value, withNewlines });
 
   // Keep as a string (not a persisted file). Trim only outer whitespace.
   const trimmed = withNewlines.trim();
@@ -247,7 +247,7 @@ async function fetchPrintfulProductById(env: PrintfulEnv, id: string): Promise<P
   if (!rawProduct || typeof rawProduct !== 'object') {
     throw new Error('PRINTFUL_PRODUCT_INVALID_PAYLOAD');
   }
-  console.log(`Fetched product ${id} from Printful`, rawProduct);
+  // console.log(`Fetched product ${id} from Printful`, rawProduct);
 
   // Printful detail endpoint returns:
   // { result: { product: {...}, variants: [...] } }

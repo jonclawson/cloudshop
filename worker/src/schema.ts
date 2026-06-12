@@ -152,3 +152,38 @@ export const files = sqliteTable('files', {
     uniqueIndex('files_parent_parent_id_url_unique').on(table.parent, table.parent_id, table.url),
   ];
 });
+
+// Normalized addresses, deduplicated per user
+export const addresses = sqliteTable('addresses', {
+  id: text('id').primaryKey().default('uuid()'),
+  user_id: text('user_id').notNull(),
+
+  name: text('name'),
+  line1: text('line1'),
+  line2: text('line2'),
+  city: text('city'),
+  state: text('state'),
+  postal_code: text('postal_code'),
+  country: text('country'),
+
+  created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
+}, (table) => {
+  return [
+    index('addresses_user_id_index').on(table.user_id),
+  ];
+});
+
+// Junction table linking orders to addresses (billing or shipping)
+export const orderAddresses = sqliteTable('order_addresses', {
+  id: text('id').primaryKey().default('uuid()'),
+  order_id: text('order_id').notNull(),
+  address_id: text('address_id').notNull(),
+  address_type: text('address_type').notNull(), // 'billing' | 'shipping'
+
+  created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
+}, (table) => {
+  return [
+    index('order_addresses_order_id_index').on(table.order_id),
+    index('order_addresses_address_id_index').on(table.address_id),
+  ];
+});
