@@ -329,6 +329,16 @@ export const ordersApi = {
       body: links,
     }),
 
+  submitToPrintful: (orderId: string) =>
+    sendRequest<{
+      submitted: boolean;
+      printful_order_id?: string;
+      printful_item_count: number;
+    }>(`/api/orders/${orderId}/submit-to-printful`, {
+      method: 'POST',
+      auth: true,
+    }),
+
   getAll: () =>
     sendRequest<{ orders?: unknown[] }>(`/api/orders`, {
       auth: true,

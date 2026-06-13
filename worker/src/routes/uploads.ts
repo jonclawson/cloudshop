@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { verifyJWT } from '../middleware/auth';
 import { getDb, schema } from '../db';
+import { verifySignedFileToken } from '../services/printful';
 
 type Bindings = {
   DB: D1Database;
@@ -108,6 +109,25 @@ uploads.get('/file/:file_key', async (c) => {
   const fileKey = c.req.param('file_key');
 
   if (!fileKey) return c.json({ error: 'file_key required' }, 400);
+
+  // If signed token + expires are provided, validate them.
+  // This allows Printful (third-party, no auth headers) to fetch files.
+  const token = c.req.query('token');
+  const expires = c.req.query('expires');
+
+  if (token && expires) {
+    const expiresNum = Number(expires);
+    if (!Number.isFinite(expiresNum)) {
+      return c.json({ error: 'Invalid expires parameter' }, 400);
+    }
+
+    const signingSecret = c.env.JWT_SECRET ?? 'dev-secret';
+    const valid = await verifySignedFileToken(fileKey, expiresNum, token, signingSecret);
+
+    if (!valid) {
+      return c.json({ error: 'Invalid or expired token' }, 403);
+    }
+  }
 
   const obj = await c.env.R2.get(fileKey);
 

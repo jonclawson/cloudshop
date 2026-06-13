@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { sqliteTable, text, integer, real, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+// import { randomUUID } from 'crypto';
 
 // Users table
 export const users = sqliteTable('users', {
@@ -62,7 +63,7 @@ export const productVariants = sqliteTable('product_variants', {
 
 // Orders table
 export const orders = sqliteTable('orders', {
-  id: text('id').primaryKey().default('uuid()'),
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID().replace(/-/g, '')),
   user_id: text('user_id').notNull(),
   stripe_payment_id: text('stripe_payment_id'),
   status: text('status').notNull().default('pending'), // pending, paid, fulfilled, cancelled

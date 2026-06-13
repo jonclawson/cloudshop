@@ -8,7 +8,11 @@ import {
   generateRefreshToken,
   hashPassword,
 } from '../services/authUtils';
-import { getPrintfulProducts, getPrintfulVariantById } from '../services/printful';
+import {
+  getPrintfulProducts,
+  getPrintfulVariantById,
+  submitPrintfulOrder,
+} from '../services/printful';
 
 type Bindings = {
   DB: D1Database;
@@ -315,7 +319,7 @@ orders.post('/', optionalAuth, async (c) => {
   }
 
   // ---- Create order + items ----
-  const orderId = crypto.randomUUID();
+  const orderId = crypto.randomUUID().replace(/-/g, '');
 
   const orderItemRows = cartItems.map((item) => {
     const quantity = Number(item.quantity ?? 0);
@@ -466,13 +470,13 @@ orders.post('/:orderId/order-item-uploads', verifyJWT, async (c) => {
   const rowsToInsert: Array<{ id: string; order_item_id: string; user_upload_id: string }> = [];
 
   for (const link of links) {
-	    if (link.print_user_upload_id && link.print_user_upload_id.length > 0) {
-	      rowsToInsert.push({
-	        id: crypto.randomUUID(),
-	        order_item_id: link.order_item_id,
-	        user_upload_id: link.print_user_upload_id,
-	      });
-	    }
+    if (link.print_user_upload_id && link.print_user_upload_id.length > 0) {
+      rowsToInsert.push({
+        id: crypto.randomUUID(),
+        order_item_id: link.order_item_id,
+        user_upload_id: link.print_user_upload_id,
+      });
+    }
     if (link.thumb_user_upload_id && link.thumb_user_upload_id.length > 0) {
       rowsToInsert.push({
         id: crypto.randomUUID(),
@@ -487,6 +491,64 @@ orders.post('/:orderId/order-item-uploads', verifyJWT, async (c) => {
   }
 
   return c.json({ ok: true, order_id: orderId }, 201);
+});
+
+// Submit printful items in this order to Printful's API.
+orders.post('/:orderId/submit-to-printful', verifyJWT, async (c) => {
+  const { userId } = c.get('auth') as { userId: string };
+  const orderId = c.req.param('orderId');
+
+  const db = getDb(c.env.DB);
+
+  // Ensure order belongs to user.
+  const orderRow = await db
+    .select({ id: schema.orders.id, user_id: schema.orders.user_id })
+    .from(schema.orders)
+    .where(eq(schema.orders.id, orderId))
+    .limit(1);
+
+  if (!orderRow[0]) return c.json({ error: 'Order not found' }, 404);
+  if (orderRow[0].user_id !== userId) return c.json({ error: 'Order not found' }, 404);
+
+  try {
+    const origin = new URL(c.req.url).origin;
+    const result = await submitPrintfulOrder({
+      env: c.env,
+      orderId,
+      origin,
+    });
+
+    return c.json(result, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+
+    if (message === 'PRINTFUL_API_KEY_MISSING') {
+      return c.json({ error: 'Printful API key not configured — cannot submit printful items' }, 400);
+    }
+
+    if (message === 'ORDER_NOT_FOUND') {
+      return c.json({ error: 'Order not found' }, 404);
+    }
+
+    if (message === 'SHIPPING_ADDRESS_REQUIRED') {
+      return c.json({ error: 'Shipping address required to submit Printful order' }, 400);
+    }
+
+    if (message.startsWith('PRINTFUL_ORDER_FAILED:')) {
+      const [, status, body] = message.match(/^PRINTFUL_ORDER_FAILED:(\d+):(.*)/) ?? [];
+      return c.json(
+        {
+          error: 'Printful order submission failed',
+          printful_status: Number(status),
+          printful_body: body ?? message,
+        },
+        502
+      );
+    }
+
+    console.error('Submit to Printful failed:', err);
+    return c.json({ error: 'Failed to submit order to Printful' }, 500);
+  }
 });
 
 orders.get('/', verifyJWT, async (c) => {

@@ -277,7 +277,7 @@ export async function getPrintfulProducts(
 
   const productsSource = getProductsSource(c);
 
-  // Don’t use the global cache when filtering by category; the cached data was built
+  // Don't use the global cache when filtering by category; the cached data was built
   // for the unfiltered list.
   if (!categoryId) {
     const nowMs = Date.now();
@@ -671,4 +671,431 @@ export async function getPrintstudioTemplateConfig(
 
   const template = pickPrintfulMockupTemplate(templates, opts);
   return mapToPrintstudioTemplateConfig(template, printfiles);
+}
+
+// ----------------------------------------------------------------------
+// Signed file URL helpers (HMAC-SHA256)
+// ----------------------------------------------------------------------
+
+/**
+ * Creates an HMAC-SHA256 signature for a file key + expiration timestamp.
+ * Returns base64url-encoded signature.
+ */
+async function signFileToken(fileKey: string, expires: number, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`${fileKey}:${expires}`);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, data);
+  const sigBytes = new Uint8Array(signature);
+  // base64url encode (no padding)
+  return btoa(String.fromCharCode(...sigBytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+/**
+ * Generates a signed URL for a file key that Printful can fetch.
+ */
+export async function buildSignedFileUrl(
+  origin: string,
+  fileKey: string,
+  secret: string,
+  ttlSeconds: number = 3600
+): Promise<string> {
+  const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const token = await signFileToken(fileKey, expires, secret);
+  const encodedKey = encodeURIComponent(fileKey);
+  return `${origin}/api/uploads/file/${encodedKey}?token=${token}&expires=${expires}`;
+}
+
+/**
+ * Validates a signed file URL token. Returns true if the token is valid and not expired.
+ */
+export async function verifySignedFileToken(
+  fileKey: string,
+  expires: number,
+  token: string,
+  secret: string
+): Promise<boolean> {
+  // Check expiration first (fast path)
+  const now = Math.floor(Date.now() / 1000);
+  if (now > expires) return false;
+
+  const expectedToken = await signFileToken(fileKey, expires, secret);
+  // Constant-time comparison to prevent timing attacks
+  if (expectedToken.length !== token.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expectedToken.length; i++) {
+    diff |= expectedToken.charCodeAt(i) ^ token.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+// ----------------------------------------------------------------------
+// Printful order submission (POST /v2/orders)
+// ----------------------------------------------------------------------
+
+export type PrintfulOrderRecipient = {
+  name: string;
+  company?: string;
+  address1: string;
+  address2?: string;
+  city: string;
+  state_code?: string;
+  state_name?: string;
+  country_code: string;
+  country_name?: string;
+  zip: string;
+  phone?: string;
+  email: string;
+  tax_number?: string;
+};
+
+export type PrintfulOrderItemLayer = {
+  type: 'file';
+  url: string;
+  layer_options?: Array<{ name: string; value: boolean | string | number }>;
+  position: {
+    width: number;
+    height: number;
+    top: number;
+    left: number;
+  };
+};
+
+export type PrintfulOrderItemPlacement = {
+  placement: string;
+  technique: string;
+  print_area_type: 'simple';
+  layers: PrintfulOrderItemLayer[];
+  placement_options?: Array<{ name: string; value: boolean | string | number }>;
+};
+
+export type PrintfulOrderItem = {
+  source: 'catalog';
+  catalog_variant_id: number;
+  external_id: string;
+  quantity: number;
+  retail_price?: string;
+  name?: string;
+  placements?: PrintfulOrderItemPlacement[];
+  orientation?: string;
+  product_options?: Array<{ name: string; value: boolean | string | number }>;
+};
+
+export type PrintfulOrderRequestBody = {
+  external_id: string;
+  shipping: string;
+  recipient: PrintfulOrderRecipient;
+  items: PrintfulOrderItem[];
+  retail_costs?: {
+    currency: string;
+    discount?: string;
+    shipping?: string;
+    tax?: string;
+  };
+};
+
+export type PrintfulOrderResponse = {
+  id: string;
+  external_id: string;
+  status: string;
+};
+
+/**
+ * Fetches a Printful catalog product id for a given variant id.
+ * The Printful products list maps variant ids to their parent catalog product id.
+ */
+async function getCatalogProductIdForVariant(c: { env: PrintfulEnv }, variantId: string): Promise<string | null> {
+  const products = await getPrintfulProducts(c, { maxProducts: 500 });
+  for (const product of products) {
+    for (const variant of product.variants) {
+      if (variant.id === variantId || variant.external_id === variantId) {
+        return product.id;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Submits a Printful order for the given order's printful items.
+ *
+ * 1. Validates the order exists with printful items
+ * 2. Reads shipping address from order_addresses + addresses
+ * 3. For each printful order item: gets the print file, generates a signed URL,
+ *    looks up template dimensions, builds a Printful placement
+ * 4. Calls POST https://api.printful.com/v2/orders
+ * 5. Stores printful_order_id on the order
+ *
+ * Returns the Printful API response.
+ */
+export async function submitPrintfulOrder(
+  params: {
+    env: PrintfulEnv & { DB: D1Database; JWT_SECRET?: string };
+    orderId: string;
+    origin: string;
+  }
+): Promise<{
+  submitted: boolean;
+  printful_order_id?: string;
+  printful_response?: unknown;
+  printful_item_count: number;
+}> {
+  const { env, orderId, origin } = params;
+  const apiKey = env.PRINTFUL_API_KEY;
+  if (!apiKey) {
+    throw new Error('PRINTFUL_API_KEY_MISSING');
+  }
+
+  const { getDb, schema } = await import('../db');
+  const { and, eq, inArray } = await import('drizzle-orm');
+  const db = getDb(env.DB);
+
+  // Fetch order
+  const orderRows = await db
+    .select()
+    .from(schema.orders)
+    .where(eq(schema.orders.id, orderId))
+    .limit(1);
+
+  const order = orderRows[0];
+  if (!order) {
+    throw new Error('ORDER_NOT_FOUND');
+  }
+
+  // Get the order's user email
+  const userRows = await db
+    .select({ email: schema.users.email })
+    .from(schema.users)
+    .where(eq(schema.users.id, order.user_id))
+    .limit(1);
+  const userEmail = userRows[0]?.email ?? '';
+
+  // Fetch order items that are printful
+  const dbOrderItems = await db
+    .select()
+    .from(schema.orderItems)
+    .where(
+      and(
+        eq(schema.orderItems.order_id, orderId),
+        eq(schema.orderItems.provider, 'printful')
+      )
+    );
+
+  if (dbOrderItems.length === 0) {
+    return {
+      submitted: false,
+      printful_item_count: 0,
+    };
+  }
+
+  // Get shipping address for this order
+  const shippingAddrRows = await db
+    .select({
+      address_id: schema.orderAddresses.address_id,
+    })
+    .from(schema.orderAddresses)
+    .where(
+      and(
+        eq(schema.orderAddresses.order_id, orderId),
+        eq(schema.orderAddresses.address_type, 'shipping')
+      )
+    )
+    .limit(1);
+
+  let recipient: PrintfulOrderRecipient | null = null;
+
+  if (shippingAddrRows[0]) {
+    const addrRows = await db
+      .select()
+      .from(schema.addresses)
+      .where(eq(schema.addresses.id, shippingAddrRows[0].address_id))
+      .limit(1);
+
+    const addr = addrRows[0];
+    if (addr) {
+      recipient = {
+        name: addr.name ?? '',
+        address1: addr.line1 ?? '',
+        address2: addr.line2 ?? undefined,
+        city: addr.city ?? '',
+        state_code: addr.state ?? undefined,
+        country_code: (addr.country ?? '').toUpperCase(),
+        zip: addr.postal_code ?? '',
+        email: userEmail,
+      };
+    }
+  }
+
+  if (!recipient) {
+    throw new Error('SHIPPING_ADDRESS_REQUIRED');
+  }
+
+  // Build order items for Printful
+  const orderItemIds = dbOrderItems.map((oi) => oi.id);
+
+  // Fetch print uploads for these order items
+  const printUploadRows = await db
+    .select({
+      order_item_id: schema.orderItemUploads.order_item_id,
+      user_upload_id: schema.orderItemUploads.user_upload_id,
+      file_key: schema.userUploads.file_key,
+      file_url: schema.userUploads.file_url,
+    })
+    .from(schema.orderItemUploads)
+    .leftJoin(
+      schema.userUploads,
+      eq(schema.userUploads.id, schema.orderItemUploads.user_upload_id)
+    )
+    .where(
+      and(
+        eq(schema.userUploads.design_name, 'print'),
+        inArray(schema.orderItemUploads.order_item_id, orderItemIds)
+      )
+    );
+
+  const printFileByOrderItemId = new Map<string, { file_key: string; file_url: string }>();
+  for (const row of printUploadRows) {
+    if (row.file_key && row.file_url) {
+      printFileByOrderItemId.set(String(row.order_item_id), {
+        file_key: String(row.file_key),
+        file_url: String(row.file_url),
+      });
+    }
+  }
+
+  const signingSecret = env.JWT_SECRET ?? 'dev-secret';
+
+  const items: PrintfulOrderItem[] = [];
+
+  for (const orderItem of dbOrderItems) {
+    const variantId = String(orderItem.product_variant_id);
+    const catalogVariantId = Number(variantId);
+    if (!Number.isFinite(catalogVariantId)) continue;
+
+    // Get print file for this order item
+    const printFile = printFileByOrderItemId.get(String(orderItem.id));
+    if (!printFile) {
+      // Skip items without print files — they can't be submitted
+      continue;
+    }
+
+    // Generate signed URL for the print file
+    const signedUrl = await buildSignedFileUrl(
+      origin,
+      printFile.file_key,
+      signingSecret,
+      3600 // 1 hour, should be plenty for Printful to fetch
+    );
+    console.log(`Generated signed URL for order item ${orderItem.id}: ${signedUrl}`);
+
+    // Look up catalog product id for template dimensions
+    const catalogProductId = await getCatalogProductIdForVariant({ env }, variantId);
+
+    // Get template dimensions for the placement
+    let placementInfo: { placement: string; technique: string; width: number; height: number; top: number; left: number } | null = null;
+
+    if (catalogProductId) {
+      try {
+        const templates = await getPrintfulMockupTemplates({ env }, catalogProductId);
+        if (templates.length > 0) {
+          const template = pickPrintfulMockupTemplate(templates, { variantId });
+          placementInfo = {
+            placement: template.placement ?? 'front',
+            technique: template.technique ?? 'dtg',
+            width: template.print_area_width,
+            height: template.print_area_height,
+            top: template.print_area_top,
+            left: template.print_area_left,
+          };
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch templates for catalog product ${catalogProductId}:`, err);
+      }
+    }
+
+    items.push({
+      source: 'catalog',
+      catalog_variant_id: catalogVariantId,
+      external_id: String(orderItem.id),
+      quantity: orderItem.quantity,
+      retail_price: orderItem.price_at_purchase.toFixed(2),
+      placements: [
+        {
+          placement: placementInfo?.placement ?? 'front',
+          technique: placementInfo?.technique ?? 'dtfilm',
+          print_area_type: 'simple',
+          layers: [
+            {
+              type: 'file',
+              url: signedUrl,
+              position: {
+                width: placementInfo?.width ?? 10,
+                height: placementInfo?.height ?? 10,
+                top: placementInfo?.top ?? 0,
+                left: placementInfo?.left ?? 0,
+              },
+            },
+          ],
+        },
+      ],
+    });
+  }
+
+  if (items.length === 0) {
+    return {
+      submitted: false,
+      printful_item_count: 0,
+    };
+  }
+
+  // Build the complete payload
+  const payload: PrintfulOrderRequestBody = {
+    external_id: orderId,
+    shipping: 'STANDARD',
+    recipient,
+    items,
+  };
+
+  // Call Printful v2 API
+  const response = await fetch('https://api.printful.com/v2/orders', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`PRINTFUL_ORDER_FAILED:${response.status}:${errorText.slice(0, 500)}`);
+  }
+
+  const printfulBody = (await response.json()) as { data?: { id?: string } };
+  const printfulOrderId = (printfulBody as any)?.data?.id ?? String((printfulBody as any)?.id ?? '');
+
+  // Store printful_order_id on the order
+  if (printfulOrderId) {
+    await db
+      .update(schema.orders)
+      .set({ printful_order_id: printfulOrderId })
+      .where(eq(schema.orders.id, orderId));
+  }
+
+  return {
+    submitted: true,
+    printful_order_id: printfulOrderId || undefined,
+    printful_response: printfulBody,
+    printful_item_count: items.length,
+  };
 }

@@ -500,7 +500,11 @@ export default function CheckoutPage() {
                   await ordersApi.linkOrderItemUploads(orderId, thumbUploadsAndPrintUploadsFiltered);
                 }
 
-                // 4) Cleanup: delete IndexedDB print assets after successful linking
+                // 4) Submit printful items to Printful (if any)
+                const pfResult = await ordersApi.submitToPrintful(orderId);
+                console.log('Printful submission result:', pfResult.data);
+
+                // 5) Cleanup: delete IndexedDB print assets after successful linking
                 const printKeys = Array.from(
                   new Set(
                     items
