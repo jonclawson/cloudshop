@@ -388,6 +388,7 @@ export async function getPrintfulVariantById(c: { env: PrintfulEnv }, id: string
     size,
     color,
     imageUrl,
+    product_id: asString(variant.product_id) ?? null,
   };
 }
 
@@ -819,15 +820,12 @@ export type PrintfulOrderResponse = {
  * The Printful products list maps variant ids to their parent catalog product id.
  */
 async function getCatalogProductIdForVariant(c: { env: PrintfulEnv }, variantId: string): Promise<string | null> {
-  const products = await getPrintfulProducts(c, { maxProducts: 500 });
-  for (const product of products) {
-    for (const variant of product.variants) {
-      if (variant.id === variantId || variant.external_id === variantId) {
-        return product.id;
-      }
-    }
+  try {
+    const v = await getPrintfulVariantById(c, variantId);
+    return v.product_id ?? null;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 /**
@@ -994,8 +992,9 @@ export async function submitPrintfulOrder(
     const signedUrl = await generateR2PresignedUrl(env, printFile.file_key, 3600);
     console.log(`Generated signed URL for order item ${orderItem.id}: ${signedUrl}`);
     
-    // Look up catalog product id for template dimensions
+    // Look up catalog product id for template dimensions 
     const catalogProductId = await getCatalogProductIdForVariant({ env }, variantId);
+    console.log(`Mapped variant ID ${variantId} to catalog product ID ${catalogProductId}`);
 
     // Get template dimensions for the placement
     let placementInfo: { placement: string; technique: string; width: number; height: number; top: number; left: number } | null = null;
@@ -1003,8 +1002,10 @@ export async function submitPrintfulOrder(
     if (catalogProductId) {
       try {
         const templates = await getPrintfulMockupTemplates({ env }, catalogProductId);
+        console.log(`Fetched ${templates.length} templates for catalog product ${catalogProductId}`);
         if (templates.length > 0) {
           const template = pickPrintfulMockupTemplate(templates, { variantId });
+          console.log(`Picked template for catalog product ${catalogProductId}:`, template);
           placementInfo = {
             placement: template.placement ?? 'front',
             technique: template.technique ?? 'dtfilm',
