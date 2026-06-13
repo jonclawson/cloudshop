@@ -1,8 +1,13 @@
 import { mockPrintful } from './mock';
+import { generateR2PresignedUrl } from './r2PresignedUrl';
 
 type PrintfulEnv = {
   PRINTFUL_API_KEY?: string;
   USE_MOCKS?: string;
+  R2_ACCOUNT_ID?: string;
+  R2_ACCESS_KEY_ID?: string;
+  R2_SECRET_ACCESS_KEY?: string;
+  R2_BUCKET_NAME?: string;
 };
 
 export type PrintfulProductVariantResponse = {
@@ -841,7 +846,6 @@ export async function submitPrintfulOrder(
   params: {
     env: PrintfulEnv & { DB: D1Database; JWT_SECRET?: string };
     orderId: string;
-    origin: string;
   }
 ): Promise<{
   submitted: boolean;
@@ -849,7 +853,7 @@ export async function submitPrintfulOrder(
   printful_response?: unknown;
   printful_item_count: number;
 }> {
-  const { env, orderId, origin } = params;
+  const { env, orderId } = params;
   const apiKey = env.PRINTFUL_API_KEY;
   if (!apiKey) {
     throw new Error('PRINTFUL_API_KEY_MISSING');
@@ -972,8 +976,6 @@ export async function submitPrintfulOrder(
     }
   }
 
-  const signingSecret = env.JWT_SECRET ?? 'dev-secret';
-
   const items: PrintfulOrderItem[] = [];
 
   for (const orderItem of dbOrderItems) {
@@ -988,15 +990,10 @@ export async function submitPrintfulOrder(
       continue;
     }
 
-    // Generate signed URL for the print file
-    const signedUrl = await buildSignedFileUrl(
-      origin,
-      printFile.file_key,
-      signingSecret,
-      3600 // 1 hour, should be plenty for Printful to fetch
-    );
+    // Generate a presigned URL for the print file using R2 S3-compatible signing
+    const signedUrl = await generateR2PresignedUrl(env, printFile.file_key, 3600);
     console.log(`Generated signed URL for order item ${orderItem.id}: ${signedUrl}`);
-
+    
     // Look up catalog product id for template dimensions
     const catalogProductId = await getCatalogProductIdForVariant({ env }, variantId);
 

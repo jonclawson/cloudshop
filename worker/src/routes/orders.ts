@@ -511,11 +511,9 @@ orders.post('/:orderId/submit-to-printful', verifyJWT, async (c) => {
   if (orderRow[0].user_id !== userId) return c.json({ error: 'Order not found' }, 404);
 
   try {
-    const origin = new URL(c.req.url).origin;
     const result = await submitPrintfulOrder({
       env: c.env,
       orderId,
-      origin,
     });
 
     return c.json(result, 200);

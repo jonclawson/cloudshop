@@ -2,7 +2,9 @@ name = "cloudshop-worker"
 main = "src/index.ts"
 compatibility_date = "2024-11-07"
 
-# Cloudflare Bindings
+# -----------------------------------------------------------
+# Default / Production Configuration
+# -----------------------------------------------------------
 [[d1_databases]]
 binding = "DB"
 database_name = "cloudshop"
@@ -16,13 +18,37 @@ bucket_name = "cloudshop-uploads"
 binding = "KV"
 id = "cloudshop-kv"
 
-# Environment-specific configurations
-[env.development]
-d1_databases = [{ binding = "DB", database_name = "cloudshop", database_id = "local-db" }]
-r2_buckets = [{ binding = "R2", bucket_name = "cloudshop-uploads" }]
-kv_namespaces = [{ binding = "KV", id = "cloudshop-kv" }]
+# -----------------------------------------------------------
+# Development Environment
+# -----------------------------------------------------------
+[[env.development.d1_databases]]
+binding = "DB"
+database_name = "cloudshop"
+database_id = "local-db"
+# Defaults to a local simulation
 
-[env.production]
-d1_databases = [{ binding = "DB", database_name = "cloudshop", database_id = "prod-db" }]
-r2_buckets = [{ binding = "R2", bucket_name = "cloudshop-uploads-prod" }]
-kv_namespaces = [{ binding = "KV", id = "cloudshop-kv-prod" }]
+[[env.development.r2_buckets]]
+binding = "R2"
+bucket_name = "cloudshop-uploads"
+remote = true # <--- ONLY R2 will connect to the live Cloudflare bucket
+
+[[env.development.kv_namespaces]]
+binding = "KV"
+id = "cloudshop-kv"
+# Defaults to a local simulation
+
+# -----------------------------------------------------------
+# Production Environment
+# -----------------------------------------------------------
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "cloudshop"
+database_id = "prod-db"
+
+[[env.production.r2_buckets]]
+binding = "R2"
+bucket_name = "cloudshop-uploads-prod"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "cloudshop-kv-prod"
