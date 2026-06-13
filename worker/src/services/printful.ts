@@ -1010,7 +1010,7 @@ export async function submitPrintfulOrder(
           const template = pickPrintfulMockupTemplate(templates, { variantId });
           placementInfo = {
             placement: template.placement ?? 'front',
-            technique: template.technique ?? 'dtg',
+            technique: template.technique ?? 'dtfilm',
             width: template.print_area_width,
             height: template.print_area_height,
             top: template.print_area_top,
