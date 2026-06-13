@@ -815,6 +815,82 @@ export type PrintfulOrderResponse = {
   status: string;
 };
 
+// ----------------------------------------------------------------------
+// Catalog API helpers (v2) — used for placement/technique/dimension lookup
+// ----------------------------------------------------------------------
+
+type CatalogProductPlacement = {
+  placement: string;
+  technique: string;
+  layers: Array<{ type: string; layer_options?: Array<{ name: string; type: string }> }>;
+};
+
+type CatalogProductResponse = {
+  id: number;
+  techniques: Array<{ key: string; display_name: string }>;
+  placements: CatalogProductPlacement[];
+};
+
+type PlacementDimension = {
+  placement: string;
+  height: number;
+  width: number;
+  orientation: string;
+};
+
+/**
+ * Fetches a catalog product's valid placements and techniques.
+ * Used to determine correct placement keys and techniques for order items.
+ */
+async function fetchCatalogProduct(c: { env: PrintfulEnv }, catalogProductId: string): Promise<CatalogProductResponse | null> {
+  const apiKey = c.env.PRINTFUL_API_KEY;
+  if (!apiKey) return null;
+
+  const url = new URL(`https://api.printful.com/v2/catalog-products/${encodeURIComponent(catalogProductId)}`);
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    });
+    if (!response.ok) return null;
+
+    const body = (await response.json()) as { data?: unknown };
+    return (body as any)?.data as CatalogProductResponse ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetches placement dimensions for a specific catalog variant.
+ * Returns the dimensions array so the caller can find the matching placement.
+ */
+async function fetchCatalogVariantPlacementDimensions(
+  c: { env: PrintfulEnv },
+  catalogProductId: string,
+  catalogVariantId: number
+): Promise<PlacementDimension[]> {
+  const apiKey = c.env.PRINTFUL_API_KEY;
+  if (!apiKey) return [];
+
+  const url = new URL(`https://api.printful.com/v2/catalog-products/${encodeURIComponent(catalogProductId)}/catalog-variants`);
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    });
+    if (!response.ok) return [];
+
+    const body = (await response.json()) as { data?: unknown };
+    const variantsData = (body as any)?.data as Array<any> ?? [];
+    const variant = variantsData.find((v: any) => Number(v.id) === catalogVariantId);
+
+    return (variant?.placement_dimensions ?? []) as PlacementDimension[];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Fetches a Printful catalog product id for a given variant id.
  * The Printful products list maps variant ids to their parent catalog product id.
@@ -991,32 +1067,41 @@ export async function submitPrintfulOrder(
     // Generate a presigned URL for the print file using R2 S3-compatible signing
     const signedUrl = await generateR2PresignedUrl(env, printFile.file_key, 3600);
     console.log(`Generated signed URL for order item ${orderItem.id}: ${signedUrl}`);
-    
-    // Look up catalog product id for template dimensions 
+
+    // Look up catalog product id from the variant endpoint
     const catalogProductId = await getCatalogProductIdForVariant({ env }, variantId);
     console.log(`Mapped variant ID ${variantId} to catalog product ID ${catalogProductId}`);
 
-    // Get template dimensions for the placement
-    let placementInfo: { placement: string; technique: string; width: number; height: number; top: number; left: number } | null = null;
+    // Fetch placement info from the Catalog API (v2) rather than mockup-templates
+    let placement: string = 'front';
+    let technique: string = 'dtfilm';
+    let width: number = 10;
+    let height: number = 10;
 
     if (catalogProductId) {
-      try {
-        const templates = await getPrintfulMockupTemplates({ env }, catalogProductId);
-        console.log(`Fetched ${templates.length} templates for catalog product ${catalogProductId}`);
-        if (templates.length > 0) {
-          const template = pickPrintfulMockupTemplate(templates, { variantId });
-          console.log(`Picked template for catalog product ${catalogProductId}:`, template);
-          placementInfo = {
-            placement: template.placement ?? 'front',
-            technique: template.technique ?? 'dtfilm',
-            width: template.print_area_width,
-            height: template.print_area_height,
-            top: template.print_area_top,
-            left: template.print_area_left,
-          };
+      // Fetch the catalog product to get valid placements and techniques
+      const catalogProduct = await fetchCatalogProduct({ env }, catalogProductId);
+      console.log(`Fetched catalog product ${catalogProductId}:`, catalogProduct ? `${catalogProduct.placements?.length ?? 0} placements` : 'null');
+
+      if (catalogProduct?.placements) {
+        // Find the front placement (or first available)
+        const frontPlacement = catalogProduct.placements.find((p) => p.placement === 'front')
+          ?? catalogProduct.placements[0];
+
+        if (frontPlacement) {
+          placement = frontPlacement.placement;
+          technique = frontPlacement.technique;
+
+          // Fetch per-variant placement dimensions
+          const dimensions = await fetchCatalogVariantPlacementDimensions({ env }, catalogProductId, catalogVariantId);
+          const frontDim = dimensions.find((d) => d.placement === frontPlacement.placement);
+          console.log(`Placement dimensions for variant ${catalogVariantId}, placement ${frontPlacement.placement}:`, frontDim ?? 'none');
+
+          if (frontDim) {
+            width = frontDim.width;
+            height = frontDim.height;
+          }
         }
-      } catch (err) {
-        console.warn(`Failed to fetch templates for catalog product ${catalogProductId}:`, err);
       }
     }
 
@@ -1028,18 +1113,18 @@ export async function submitPrintfulOrder(
       retail_price: orderItem.price_at_purchase.toFixed(2),
       placements: [
         {
-          placement: placementInfo?.placement ?? 'front',
-          technique: placementInfo?.technique ?? 'dtfilm',
+          placement,
+          technique,
           print_area_type: 'simple',
           layers: [
             {
               type: 'file',
               url: signedUrl,
               position: {
-                width: placementInfo?.width ?? 10,
-                height: placementInfo?.height ?? 10,
-                top: placementInfo?.top ?? 0,
-                left: placementInfo?.left ?? 0,
+                width,
+                height,
+                top: 0,
+                left: 0,
               },
             },
           ],
