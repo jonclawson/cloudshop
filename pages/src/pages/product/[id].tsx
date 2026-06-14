@@ -269,9 +269,9 @@ export default function ProductPage() {
     <div className="main-class">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
-          <div className="bg-gray-100 rounded-lg h-96 overflow-hidden">
+          <div className=" rounded-lg h-96 overflow-hidden">
             {mainImageSrc ? (
-              <img src={mainImageSrc} alt={displayName} className="w-full h-full object-cover" />
+              <img src={mainImageSrc} alt={displayName} className="w-full h-full object-contain" />
             ) : (
               <div className="h-full w-full flex items-center justify-center">
                 <span className="text-gray-500 text-center px-4">{displayName}</span>
@@ -298,7 +298,7 @@ export default function ProductPage() {
                       src={src}
                       alt={displayName}
                       loading="lazy"
-                      className="h-16 w-16 object-cover cursor-pointer"
+                      className="h-16 w-16 object-contain cursor-pointer"
                     />
                   </button>
                 );
@@ -309,7 +309,51 @@ export default function ProductPage() {
 
         <div>
           <h1 className="text-3xl font-bold mb-4">{displayName}</h1>
+          <div className="mb-4">
+            {product.variants && product.variants.length > 0 && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Option</label>
+                <select
+                  value={selectedVariant?.id || ''}
+                  onChange={(e) => {
+                    const variant = product.variants?.find(
+                      (v) => String(v.id) === e.target.value
+                    );
+                    setSelectedVariant(variant || null);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  {product.variants.map((variant) => (
+                    <option key={variant.id} value={variant.id}>
+                      {variant.title || `${variant.size} / ${variant.color}`} - {priceLabel}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
+            <button
+              type="button"
+              onClick={() => void handleAddToCart()}
+              disabled={!selectedVariant}
+              className="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Add to Cart
+            </button>
+            {product.provider === 'printful' && (
+            <button
+              type="button"
+              onClick={() => {
+                // Ensure preview uses defaults until user saves a thumb.
+                clearTempState();
+                setCustomizeOpen(true);
+              }}
+              className="w-full mt-3 bg-white text-black border-2 border-black py-3 rounded-md hover:bg-black hover:text-white transition cursor-pointer"
+            >
+              customize
+            </button>
+          )}
+          </div>
           <div className="text-gray-600 mb-4">
             <ReactMarkdown
               skipHtml
@@ -325,49 +369,6 @@ export default function ProductPage() {
             </ReactMarkdown>
           </div>
 
-          {product.variants && product.variants.length > 0 && (
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Select Option</label>
-              <select
-                value={selectedVariant?.id || ''}
-                onChange={(e) => {
-                  const variant = product.variants?.find(
-                    (v) => String(v.id) === e.target.value
-                  );
-                  setSelectedVariant(variant || null);
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              >
-                {product.variants.map((variant) => (
-                  <option key={variant.id} value={variant.id}>
-                    {variant.title || `${variant.size} / ${variant.color}`} - {priceLabel}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => void handleAddToCart()}
-            disabled={!selectedVariant}
-            className="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Add to Cart
-          </button>
-          {product.provider === 'printful' && (
-          <button
-            type="button"
-            onClick={() => {
-              // Ensure preview uses defaults until user saves a thumb.
-              clearTempState();
-              setCustomizeOpen(true);
-            }}
-            className="w-full mt-3 bg-white text-black border-2 border-black py-3 rounded-md hover:bg-black hover:text-white transition cursor-pointer"
-          >
-            customize
-          </button>
-          )}
         </div>
       </div>
 
