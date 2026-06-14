@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Wrangler local dev server for Worker (binds D1, R2, KV)
+  wrangler:
+    image: node:22
+    working_dir: /app/worker
+    volumes:
+      - .:/app
+      - wrangler_cache:/.wrangler
+    ports:
+      - "8787:8787"
+    env_file:
+      - ./worker/.dev.vars.development
+    environment:
+      NODE_ENV: development
+    command: >
+      sh -c "npm install && rm -rf /root/.config/.wrangler/state/v3/d1 && rm -rf /.wrangler/state/v3/d1 && npx wrangler d1 migrations apply cloudshop --local && npm run dev"
+    networks:
+      - cloudshop
+
+  # Node.js for Pages dev server
+  pages:
+    image: node:22-alpine
+    working_dir: /app/pages
+    volumes:
+      - .:/app
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env.development
+    # environment:
+    #   NODE_ENV: development
+    #   VITE_USE_MOCKS: "true"
+    #   VITE_API_BASE_URL: http://localhost:8787
+    command: >
+      sh -c "npm install && npm run dev"
+    networks:
+      - cloudshop
+    depends_on:
+      - wrangler
+
+volumes:
+  wrangler_cache:
+
+networks:
+  cloudshop:
+    driver: bridge
