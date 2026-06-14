@@ -37,7 +37,7 @@ export default function CategoryPage() {
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-row lg:flex-row gap-8">
         <div className="md:block hidden">
           {categoriesError ? (
             <p className="text-sm text-red-600">Failed to load categories</p>
