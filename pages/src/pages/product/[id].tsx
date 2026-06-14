@@ -30,6 +30,8 @@ type Product = {
   images?: string[];
 
   provider?: 'printful' | string;
+  custom?: {id: string, additional_price: string}[];
+  options?: {id: string, type: string, title: string, values: any, additional_price: string}[];
 };
 
 const PRINT_ASSET_KEYS_LS_KEY = 'printAssetKeys';
@@ -311,7 +313,7 @@ export default function ProductPage() {
           <h1 className="text-3xl font-bold mb-4">{displayName}</h1>
           <div className="mb-4">
             {product.variants && product.variants.length > 0 && (
-              <div className="mb-6">
+              <div className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Select Option</label>
                 <select
                   value={selectedVariant?.id || ''}
@@ -332,6 +334,56 @@ export default function ProductPage() {
               </div>
             )}
 
+            {product.options && product.options.length > 0 && (
+              <div className="mb-3">
+                {product.options.map((option) => (
+                  <div key={option.id} className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{option.title}</label>
+
+                    {(option.type === 'radio' || option.type === 'select') && (
+                    <select className="w-full px-3 py-2 border border-gray-300 rounded-md">
+                      {option.values && Object.entries(option.values).map(([key, value]: [string, any]) => (
+                        <option key={key} value={key}>
+                          {value} {option.additional_price ? `(+${option.additional_price})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    )}
+                    
+                    {option.type === 'text' && (
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        placeholder={option.title}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+
+            {product.custom && product.custom.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                // Ensure preview uses defaults until user saves a thumb.
+                clearTempState();
+                setCustomizeOpen(true);
+              }}
+              className="w-full mb-3 bg-white text-black border-2 border-black py-3 rounded-md hover:bg-black hover:text-white transition cursor-pointer"
+            >
+              customize
+              {product.custom?.map((custom: { id?: string, additional_price?: string }) => 
+                custom?.id === 'default' && (
+                  <span key={custom.id} >
+                    {custom?.additional_price}
+                  </span>
+                )
+              )}
+            </button>
+            )}
+
             <button
               type="button"
               onClick={() => void handleAddToCart()}
@@ -340,19 +392,6 @@ export default function ProductPage() {
             >
               Add to Cart
             </button>
-            {product.provider === 'printful' && (
-            <button
-              type="button"
-              onClick={() => {
-                // Ensure preview uses defaults until user saves a thumb.
-                clearTempState();
-                setCustomizeOpen(true);
-              }}
-              className="w-full mt-3 bg-white text-black border-2 border-black py-3 rounded-md hover:bg-black hover:text-white transition cursor-pointer"
-            >
-              customize
-            </button>
-          )}
           </div>
           <div className="text-gray-600 mb-4">
             <ReactMarkdown

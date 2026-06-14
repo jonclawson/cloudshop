@@ -36,6 +36,8 @@ export type PrintfulProductResponse = {
 
   // Used by the product detail page thumbnails (GET /api/products/:id)
   images?: string[];
+  custom?: unknown[];
+  options?: unknown[];
 };
 
 type PrintfulListResponse = {
@@ -154,6 +156,10 @@ function normalizePrintfulProduct(product: UnknownRecord, variantsOverrideRaw?: 
 
   const productImageForList = imageFromPayload ?? mockImages?.[0];
 
+  const files = Array.isArray((product as any).files) ? (product as any).files : [];
+
+  const options = Array.isArray((product as any).options) ? (product as any).options : [];
+
   return {
     id: storefrontProductId,
     external_id: externalId,
@@ -164,6 +170,8 @@ function normalizePrintfulProduct(product: UnknownRecord, variantsOverrideRaw?: 
     variants,
     image: productImageForList,
     images: imagesFromPayload ?? mockImages,
+    custom: files,
+    options
   };
 }
 
