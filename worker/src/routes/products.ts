@@ -3,6 +3,18 @@ import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { getDb, schema } from '../db';
 import { getPrintfulProductById, getPrintfulProducts, getPrintstudioTemplateConfig, type PrintfulProductResponse } from '../services/printful';
 
+const printfulTechniques = [
+  "dtg",                        // Direct-to-Garment printing
+  "dtflex",                     // Direct-to-Film (DTF) heat transfers
+  "embroidery",                 // Standard physical thread embroidery
+  "unlimited_color_embroidery", // Full-color Coloreel thread embroidery
+  "aop",                        // All-Over Print (Cut & Sew sublimation)
+  "sublimation",                // Sublimation coating (Mugs, phone cases)
+  "uv_printing",                // UV-cured digital printing (Tumblers, clear cases)
+  "digital_printing",           // Giclée/Pigment printing (Posters, wall art, stickers)
+  "knitting"                    // Jacquard weaving (Custom sweaters, beanies)
+];
+
 type Bindings = {
   DB: D1Database;
   PRINTFUL_API_KEY?: string;
