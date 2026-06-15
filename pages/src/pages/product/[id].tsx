@@ -61,6 +61,8 @@ export default function ProductPage() {
   const [thumbFile, setThumbFile] = useState<File | null>(null);
   const [thumbFileUrl, setThumbFileUrl] = useState<string | null>(null);
 
+  const [options, setOptions] = useState<{[key: string]: any}>({});
+
   useEffect(() => {
     if (!thumbFileUrl) return;
 
@@ -106,6 +108,18 @@ export default function ProductPage() {
             ) ?? null;
 
           setSelectedVariant(mediumBySize ?? mediumByTitle ?? variants[0]);
+
+          if (nextProduct.options) {
+            nextProduct.options.forEach((option) => {
+              if (option.values) {
+                const firstValue = Object.entries(option.values)[0];
+                setOptions((prev) => ({
+                  ...prev,
+                  [option.id]: {option, value: firstValue},
+                }));
+              }
+            });
+          }
         }
       } catch (error) {
         console.error('Failed to fetch product:', error);
@@ -264,6 +278,14 @@ export default function ProductPage() {
     router('/cart');
   };
 
+  const handleOptionChange = (optionId: string, value: any) => {
+    const option = product?.options?.find((o) => o.id === optionId);
+    setOptions((prev) => ({
+      ...prev,
+      [optionId]: {option, value: JSON.parse(value)},
+    }));
+  }
+
   if (loading) return <div className="p-8">Loading...</div>;
   if (!product) return <div className="p-8">Product not found</div>;
 
@@ -336,14 +358,16 @@ export default function ProductPage() {
 
             {product.options && product.options.length > 0 && (
               <div className="mb-3">
-                {product.options.map((option) => (
+                {(product).options.map((option) => (
                   <div key={option.id} className="mb-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">{option.title}</label>
 
                     {(option.type === 'radio' || option.type === 'select') && (
-                    <select className="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    <select className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      onChange={(e) => handleOptionChange(option.id, e.target.value)}
+                      >
                       {option.values && Object.entries(option.values).map(([key, value]: [string, any]) => (
-                        <option key={key} value={key}>
+                        <option key={key} value={JSON.stringify({[key]: value})}>
                           {value} {option.additional_price ? `(+${option.additional_price})` : ''}
                         </option>
                       ))}
@@ -355,6 +379,7 @@ export default function ProductPage() {
                         type="text"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                         placeholder={option.title}
+                        onChange={(e) => handleOptionChange(option.id, JSON.stringify(e.target.value))}
                       />
                     )}
                   </div>
