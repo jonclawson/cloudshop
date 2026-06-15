@@ -364,8 +364,9 @@ export default function ProductPage() {
                   <div key={option.id} className="mb-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">{option.title}</label>
 
-                    {(option.type === 'radio' || option.type === 'select') && (
+                    {(option.type === 'radio' || option.type === 'select' || option.type === 'multi_select') && (
                     <select className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      multiple={option.type === 'multi_select'}
                       onChange={(e) => handleOptionChange(option.id, e.target.value)}
                       >
                       {option.values && Object.entries(option.values).map(([key, value]: [string, any]) => (
