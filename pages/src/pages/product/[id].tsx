@@ -10,6 +10,17 @@ import { productsApi, templatesApi, type PrintstudioTemplateConfig } from '../..
 import { putPrintFile } from '../../printAssetsIdb';
 import FullScreenDialog from '../../components/FullScreenDialog';
 
+const techniqueKeys = [
+    "cut-sew",
+    "digital",
+    "direct-to-fabric",
+    "dtfilm",
+    "dtg",
+    "embroidery",
+    "sublimation",
+    "uv"
+];
+
 type ProductVariant = {
   id: number | string;
   external_id?: string;
@@ -32,6 +43,7 @@ type Product = {
   provider?: 'printful' | string;
   custom?: {id: string, additional_price: string}[];
   options?: {id: string, type: string, title: string, values: any, additional_price: string}[];
+  techniques?: {key: string, display_name: string, is_default: boolean}[];
 };
 
 const PRINT_ASSET_KEYS_LS_KEY = 'printAssetKeys';
@@ -62,6 +74,7 @@ export default function ProductPage() {
   const [thumbFileUrl, setThumbFileUrl] = useState<string | null>(null);
 
   const [options, setOptions] = useState<{[key: string]: any}>({});
+  const [technique, setTechnique] = useState<{key: string, display_name: string, is_default: boolean} | null>(null);
 
   useEffect(() => {
     if (!thumbFileUrl) return;
@@ -119,6 +132,11 @@ export default function ProductPage() {
                 }));
               }
             });
+          }
+
+          if (nextProduct.techniques) {
+            const defaultTechnique = nextProduct.techniques.find(t => t.is_default) ?? nextProduct.techniques[0];
+            setTechnique(defaultTechnique);
           }
         }
       } catch (error) {
@@ -288,6 +306,11 @@ export default function ProductPage() {
     }));
   }
 
+  const handleTechniqueChange = (techniqueKey: string) => {
+    const technique = product?.techniques?.find((t) => t.key === techniqueKey) ?? null;
+    setTechnique(technique);
+  }
+
   if (loading) return <div className="p-8">Loading...</div>;
   if (!product) return <div className="p-8">Product not found</div>;
 
@@ -358,9 +381,25 @@ export default function ProductPage() {
               </div>
             )}
 
-            {product.options && product.options.length > 0 && (
+            {product.techniques && product?.techniques.length > 0 && (
               <div className="mb-3">
-                {(product).options.map((option) => (
+                <label className="block text-sm font-medium text-gray-700 mb-2">Technique</label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  onChange={(e) => handleTechniqueChange(e.target.value)}
+                >
+                  {(product as Product).techniques?.map((technique: {key?: string, display_name?: string}) => (
+                    <option key={technique.key} value={technique.key}>
+                      {technique.display_name || technique.key}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {(technique?.key === 'embroidery' || technique?.key === 'cut-sew') && product.options && product.options.length > 0 && (
+              <div className="mb-3">
+                {product?.options.map((option) => (
                   <div key={option.id} className="mb-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">{option.title}</label>
 

@@ -1,6 +1,17 @@
 import { mockPrintful } from './mock';
 import { generateR2PresignedUrl } from './r2PresignedUrl';
 
+const techniqueKeys = [
+    "cut-sew",
+    "digital",
+    "direct-to-fabric",
+    "dtfilm",
+    "dtg",
+    "embroidery",
+    "sublimation",
+    "uv"
+];
+
 type PrintfulEnv = {
   PRINTFUL_API_KEY?: string;
   USE_MOCKS?: string;
@@ -38,6 +49,7 @@ export type PrintfulProductResponse = {
   images?: string[];
   custom?: unknown[];
   options?: unknown[];
+  techniques?: unknown[];
 };
 
 type PrintfulListResponse = {
@@ -160,6 +172,10 @@ function normalizePrintfulProduct(product: UnknownRecord, variantsOverrideRaw?: 
 
   const options = Array.isArray((product as any).options) ? (product as any).options : [];
 
+  // disable embroidery.
+  const techniques = Array.isArray((product as any).techniques) ? (product as any)
+  .techniques.filter((t: {key?: string}) => typeof t === 'object' && t.key.toLocaleLowerCase() !== 'embroidery') : [];
+
   return {
     id: storefrontProductId,
     external_id: externalId,
@@ -171,7 +187,8 @@ function normalizePrintfulProduct(product: UnknownRecord, variantsOverrideRaw?: 
     image: productImageForList,
     images: imagesFromPayload ?? mockImages,
     custom: files,
-    options
+    options,
+    techniques
   };
 }
 
