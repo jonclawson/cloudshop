@@ -266,6 +266,8 @@ export default function ProductPage() {
       // IMPORTANT: thumb (data URL) is stored here for cart display.
       image: thumbDataUrl,
 
+      options,
+
       // These extra fields will be used by cart/cleanup later.
       printAssetKey: printAssetKey ?? undefined,
 
