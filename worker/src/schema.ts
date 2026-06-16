@@ -82,6 +82,7 @@ export const orderItems = sqliteTable('order_items', {
   quantity: integer('quantity').notNull(),
   price_at_purchase: real('price_at_purchase').notNull(),
   created_at: integer('created_at').default(sql`CURRENT_TIMESTAMP`),
+  meta: text('meta'), // JSON string for any extra data (e.g. selected options, technique, etc.)
 });
 
 export const orderItemUploads = sqliteTable(

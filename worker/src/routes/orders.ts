@@ -34,6 +34,7 @@ type OrderRequestItem = {
   quantity?: number;
   price?: number; // cents (from use-shopping-cart)
   currency?: string;
+  meta?: string
 };
 
 type AddressInput = {
@@ -340,6 +341,7 @@ orders.post('/', optionalAuth, async (c) => {
       provider: isPrintful ? 'printful' : null,
       quantity,
       price_at_purchase: toMoneyDollarsFromCents(priceCents),
+      meta: item.meta ? String(item.meta) : null,
     };
   });
 

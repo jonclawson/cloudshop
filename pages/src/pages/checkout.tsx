@@ -17,12 +17,15 @@ type CartLine = {
   quantity: number;
   price: number; // cents
   currency: string;
+  meta?: string; // JSON string for any extra meta (e.g. technique, options, etc.)
 };
 
 // Extra fields we attach in product page
 type CartLineWithUploads = CartLine & {
   image?: string; // thumb data URL (from product page)
   printAssetKey?: string; // IDB key for print file
+  technique?: string;
+  options?: Record<string, string>;
 };
 
 function isValidEmail(email: string): boolean {
@@ -153,6 +156,7 @@ export default function CheckoutPage() {
       quantity: item.quantity,
       price: item.price,
       currency: item.currency,
+      meta: JSON.stringify({ technique: item.technique, options: item.options }), // Include extra meta for display in order summary
     })) satisfies CartLine[];
   }, [items]);
 

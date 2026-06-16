@@ -43,6 +43,13 @@
       "when": 1781298957205,
       "tag": "0005_order-id-32-c",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1781580991666,
+      "tag": "0006_order_items_meta",
+      "breakpoints": true
     }
   ]
 }
