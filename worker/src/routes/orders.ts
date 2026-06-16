@@ -9,8 +9,11 @@ import {
   hashPassword,
 } from '../services/authUtils';
 import {
+  createAndPollPrintfulEstimate,
+  enrichEstimateOrderItemsWithPlacements,
   getPrintfulProducts,
   getPrintfulVariantById,
+  resolveStateFromZip,
   submitPrintfulOrder,
 } from '../services/printful';
 
@@ -548,6 +551,99 @@ orders.post('/:orderId/submit-to-printful', verifyJWT, async (c) => {
 
     console.error('Submit to Printful failed:', err);
     return c.json({ error: 'Failed to submit order to Printful' }, 500);
+  }
+});
+
+// Get printful shipping estimate for order items.
+orders.post('/printful-estimate', async (c) => {
+  try {
+    const body = await c.req.json<{
+      recipient: { state_code?: string; country_code: string; zip?: string };
+      order_items: Array<{
+        catalog_variant_id: number;
+        external_id: string;
+        quantity: number;
+        retail_price?: string;
+        name?: string;
+      }>;
+      retail_costs?: {
+        currency?: string;
+        discount?: string;
+        shipping?: string;
+        tax?: string;
+      };
+    }>();
+
+    if (!body.recipient?.country_code) {
+      return c.json({ error: 'Country code required' }, 400);
+    }
+    if (!body.order_items?.length) {
+      return c.json({ error: 'Order items required' }, 400);
+    }
+
+    // Auto-resolve state from zip if not provided (US-only)
+    let recipient = { ...body.recipient };
+    if (!recipient.state_code && recipient.country_code === 'US' && recipient.zip) {
+      const resolved = await resolveStateFromZip(recipient.zip);
+      if (resolved) {
+        recipient.state_code = resolved.stateCode;
+      }
+    }
+
+    // Enrich order items with placement data (technique, dimensions, placeholder images)
+    const enrichedOrderItems = await enrichEstimateOrderItemsWithPlacements(c.env, body.order_items);
+
+    const payload = {
+      recipient,
+      order_items: enrichedOrderItems,
+      retail_costs: body.retail_costs,
+    };
+    console.log('Creating Printful estimate with payload:', JSON.stringify(payload, null, 2));
+    const result = await createAndPollPrintfulEstimate(c.env, payload);
+
+    return c.json(result, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+
+    if (message === 'MISSING_PRINTFUL_API_KEY') {
+      return c.json({ error: 'Printful API key not configured' }, 400);
+    }
+
+    if (message.startsWith('PRINTFUL_ESTIMATE_CREATE_FAILED:')) {
+      const [, status, body] = message.match(/^PRINTFUL_ESTIMATE_CREATE_FAILED:(\d+):(.*)/) ?? [];
+      return c.json(
+        {
+          error: 'Printful estimate creation failed',
+          printful_status: Number(status),
+          printful_body: body ?? message,
+        },
+        502
+      );
+    }
+
+    if (message.startsWith('PRINTFUL_ESTIMATE_GET_FAILED:')) {
+      const [, status, body] = message.match(/^PRINTFUL_ESTIMATE_GET_FAILED:(\d+):(.*)/) ?? [];
+      return c.json(
+        {
+          error: 'Printful estimate polling failed',
+          printful_status: Number(status),
+          printful_body: body ?? message,
+        },
+        502
+      );
+    }
+
+    if (message === 'PRINTFUL_ESTIMATE_TIMEOUT') {
+      return c.json({ error: 'Printful estimate timed out' }, 504);
+    }
+
+    if (message.startsWith('PRINTFUL_ESTIMATE_FAILED:')) {
+      const reasons = message.replace('PRINTFUL_ESTIMATE_FAILED:', '');
+      return c.json({ error: 'Printful estimate failed', reasons }, 502);
+    }
+
+    console.error('Printful estimate failed:', err);
+    return c.json({ error: 'Failed to get estimate' }, 500);
   }
 });
 

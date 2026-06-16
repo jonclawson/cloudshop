@@ -7,6 +7,7 @@ import { useParams } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 
 import { productsApi, templatesApi, type PrintstudioTemplateConfig } from '../../useApi';
+import PrintfulEstimate from '../../components/PrintfulEstimate';
 import { putPrintFile } from '../../printAssetsIdb';
 import FullScreenDialog from '../../components/FullScreenDialog';
 
@@ -462,6 +463,24 @@ export default function ProductPage() {
             >
               Add to Cart
             </button>
+
+            {product.provider === 'printful' && selectedVariant && (
+              <PrintfulEstimate
+                mode="manual"
+                orderItems={[
+                  {
+                    catalog_variant_id: Number(selectedVariant.id),
+                    external_id: String(product.external_id ?? product.id),
+                    quantity: 1,
+                    retail_price: selectedVariant.price.toFixed(2),
+                    name: displayName,
+                  },
+                ]}
+                retailCosts={{
+                  currency: 'USD',
+                }}
+              />
+            )}
           </div>
           <div className="text-gray-600 mb-4">
             <ReactMarkdown

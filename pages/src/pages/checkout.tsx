@@ -5,6 +5,7 @@ import { AddressElement, Elements, PaymentElement } from '@stripe/react-stripe-j
 
 import { useAuth } from '../AuthContext';
 import { ordersApi, uploadsApi } from '../useApi';
+import PrintfulEstimate from '../components/PrintfulEstimate';
 import { useShoppingCart } from 'use-shopping-cart';
 import { deleteManyPrintAssets, getPrintFileBlob } from '../printAssetsIdb';
 
@@ -160,6 +161,27 @@ export default function CheckoutPage() {
     })) satisfies CartLine[];
   }, [items]);
 
+  const orderItemsForEstimate = useMemo(() => {
+    return items
+      .filter((item) => item.provider === 'printful')
+      .map((item) => ({
+        catalog_variant_id: Number(item.variantId || item.id),
+        external_id: String(item.productId || item.id),
+        quantity: item.quantity,
+        retail_price: (item.price / 100).toFixed(2),
+        name: item.name,
+      }));
+  }, [items]);
+
+  const shippingAddressForEstimate = useMemo(() => {
+    if (!shippingAddress) return undefined;
+    return {
+      state_code: shippingAddress.state ?? undefined,
+      country_code: shippingAddress.country ?? '',
+      zip: shippingAddress.postal_code ?? undefined,
+    };
+  }, [shippingAddress]);
+
   const emailValid = isValidEmail(email);
 
   const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
@@ -249,6 +271,14 @@ export default function CheckoutPage() {
             <span className="font-semibold">Total</span>
             <span className="font-semibold">{formattedTotalPrice}</span>
           </div>
+
+          {orderItemsForEstimate.length > 0 && (
+            <PrintfulEstimate
+              mode="auto"
+              orderItems={orderItemsForEstimate}
+              shippingAddress={shippingAddressForEstimate}
+            />
+          )}
 
           <div className="mt-6">
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="checkout-email">

@@ -303,7 +303,58 @@ type AddressInput = {
   country?: string;
 };
 
+export type PrintfulEstimateResponse = {
+  id: string;
+  status: string;
+  costs: {
+    calculation_status: string;
+    currency: string;
+    subtotal: string;
+    discount: string;
+    shipping: string;
+    digitization: string;
+    additional_fee: string;
+    fulfillment_fee: string;
+    retail_delivery_fee: string;
+    vat: string;
+    tax: string;
+    total: string;
+  };
+  retail_costs: {
+    calculation_status: string;
+    currency: string;
+    subtotal: string;
+    discount: string;
+    shipping: string;
+    vat: string;
+    tax: string;
+    total: string;
+  };
+  failure_reasons: string[];
+};
+
 export const ordersApi = {
+  getPrintfulEstimate: (payload: {
+    recipient: { state_code?: string; country_code: string; zip?: string };
+    order_items: Array<{
+      catalog_variant_id: number;
+      external_id: string;
+      quantity: number;
+      retail_price?: string;
+      name?: string;
+    }>;
+    retail_costs?: {
+      currency?: string;
+      discount?: string;
+      shipping?: string;
+      tax?: string;
+    };
+  }) =>
+    sendRequest<PrintfulEstimateResponse>(`/api/orders/printful-estimate`, {
+      method: 'POST',
+      body: payload,
+    }),
+
   create: (
     items: unknown[],
     addresses: { billing_address?: AddressInput; shipping_address?: AddressInput },

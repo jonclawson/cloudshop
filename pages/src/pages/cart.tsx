@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import PrintfulEstimate from '../components/PrintfulEstimate';
 import { useShoppingCart } from 'use-shopping-cart';
 import { useNavigate, Link } from 'react-router-dom';
 import { deletePrintAssets } from '../printAssetsIdb';
@@ -79,6 +80,19 @@ export default function CartPage() {
       cancelled = true;
     };
   }, [referencedKeysKey]);
+
+  const cartItemsForEstimate = useMemo(() => {
+    // Filter to printful items and map to the format PrintfulEstimate expects
+    return items
+      .filter((item) => (item as any).provider === 'printful')
+      .map((item) => ({
+        catalog_variant_id: Number((item as any).variantId || item.id),
+        external_id: String((item as any).productId || item.id),
+        quantity: item.quantity,
+        retail_price: ((item as any).price / 100).toFixed(2),
+        name: item.name,
+      }));
+  }, [items]);
 
   return (
     <div className="main-class">
@@ -172,6 +186,15 @@ export default function CartPage() {
               </div>
             ))}
           </div>
+
+          {cartItemsForEstimate.length > 0 && (
+            <div className="rounded-lg border border-gray-200 p-6">
+              <PrintfulEstimate
+                mode="manual"
+                orderItems={cartItemsForEstimate}
+              />
+            </div>
+          )}
 
           <div className="rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between text-lg font-semibold">

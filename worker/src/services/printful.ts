@@ -277,7 +277,6 @@ async function fetchPrintfulProductById(env: PrintfulEnv, id: string): Promise<P
   if (!rawProduct || typeof rawProduct !== 'object') {
     throw new Error('PRINTFUL_PRODUCT_INVALID_PAYLOAD');
   }
-  // console.log(`Fetched product ${id} from Printful`, rawProduct);
 
   // Printful detail endpoint returns:
   // { result: { product: {...}, variants: [...] } }
@@ -705,6 +704,299 @@ export async function getPrintstudioTemplateConfig(
 }
 
 // ----------------------------------------------------------------------
+// Printful order estimation (v2)
+// ----------------------------------------------------------------------
+
+/**
+ * Resolves US state abbreviation from a 5-digit ZIP code using Zippopotam.
+ * Returns the state_code and city if found.
+ */
+export async function resolveStateFromZip(zipCode: string): Promise<{ stateCode: string; cityName: string } | null> {
+  const cleanZip = zipCode.trim().substring(0, 5);
+  if (!/^\d{5}$/.test(cleanZip)) return null;
+
+  try {
+    const response = await fetch(`https://api.zippopotam.us/us/${cleanZip}`);
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as { places?: Array<{ 'state abbreviation'?: string; 'place name'?: string }> };
+    const place = data?.places?.[0];
+    if (!place) return null;
+
+    return {
+      stateCode: place['state abbreviation'] ?? '',
+      cityName: place['place name'] ?? '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+export type PrintfulEstimateRecipient = {
+  state_code?: string;
+  country_code: string;
+  zip?: string;
+};
+
+export type PrintfulEstimateOrderItem = {
+  source: 'catalog';
+  catalog_variant_id: number;
+  external_id: string;
+  quantity: number;
+  retail_price?: string;
+  name?: string;
+  placements?: PrintfulOrderItemPlacement[];
+  orientation?: string;
+};
+
+export type PrintfulEstimateRequestBody = {
+  recipient: PrintfulEstimateRecipient;
+  order_items: PrintfulEstimateOrderItem[];
+  retail_costs?: {
+    currency?: string;
+    discount?: string;
+    shipping?: string;
+    tax?: string;
+  };
+};
+
+export type PrintfulEstimateCosts = {
+  calculation_status: string;
+  currency: string;
+  subtotal: string;
+  discount: string;
+  shipping: string;
+  digitization: string;
+  additional_fee: string;
+  fulfillment_fee: string;
+  retail_delivery_fee: string;
+  vat: string;
+  tax: string;
+  total: string;
+};
+
+export type PrintfulEstimateRetailCosts = {
+  calculation_status: string;
+  currency: string;
+  subtotal: string;
+  discount: string;
+  shipping: string;
+  vat: string;
+  tax: string;
+  total: string;
+};
+
+export type PrintfulEstimateTaskResponse = {
+  id: string;
+  status: string;
+  costs: PrintfulEstimateCosts;
+  retail_costs: PrintfulEstimateRetailCosts;
+  failure_reasons: string[];
+};
+
+/**
+ * Creates a Printful order estimation task.
+ * POST /v2/order-estimation-tasks
+ */
+export async function createPrintfulEstimateTask(
+  env: PrintfulEnv,
+  payload: PrintfulEstimateRequestBody
+): Promise<string> {
+  const apiKey = env.PRINTFUL_API_KEY;
+  if (!apiKey) {
+    throw new Error('MISSING_PRINTFUL_API_KEY');
+  }
+
+  const response = await fetch('https://api.printful.com/v2/order-estimation-tasks', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`PRINTFUL_ESTIMATE_CREATE_FAILED:${response.status}:${text.slice(0, 500)}`);
+  }
+
+  const body = (await response.json()) as { data?: { id?: string } };
+  const taskId = body?.data?.id;
+  if (!taskId) {
+    throw new Error('PRINTFUL_ESTIMATE_MISSING_TASK_ID');
+  }
+
+  return taskId;
+}
+
+/**
+ * Fetches a Printful order estimation task by ID.
+ * GET /v2/order-estimation-tasks/{taskId}
+ */
+export async function getPrintfulEstimateTask(
+  env: PrintfulEnv,
+  taskId: string
+): Promise<PrintfulEstimateTaskResponse | null> {
+  const apiKey = env.PRINTFUL_API_KEY;
+  if (!apiKey) {
+    throw new Error('MISSING_PRINTFUL_API_KEY');
+  }
+
+  const url = new URL(`https://api.printful.com/v2/order-estimation-tasks?id=${(taskId)}`);
+  console.log(`Fetching Printful estimate task from ${url.toString()}...`);
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+    },
+  });
+
+  // 404 means the task hasn't been created yet on Printful's side — return null so caller keeps polling
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`PRINTFUL_ESTIMATE_GET_FAILED:${response.status}:${text.slice(0, 500)}`);
+  }
+
+  const body = (await response.json()) as { data?: PrintfulEstimateTaskResponse };
+  const task = body?.data;
+  if (!task) {
+    throw new Error('PRINTFUL_ESTIMATE_INVALID_RESPONSE');
+  }
+
+  return task;
+}
+
+/**
+ * Creates an estimate task and polls until completed or failed.
+ * Throws on failure or timeout.
+ */
+export async function createAndPollPrintfulEstimate(
+  env: PrintfulEnv,
+  payload: PrintfulEstimateRequestBody,
+  timeoutMs: number = 30_000
+): Promise<PrintfulEstimateTaskResponse> {
+  const taskId = await createPrintfulEstimateTask(env, payload);
+
+  const pollIntervalMs = 2_000;
+  const maxAttempts = Math.ceil(timeoutMs / pollIntervalMs);
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    console.log(`Polling Printful estimate task ${taskId}, attempt ${attempt + 1}/${maxAttempts}...`);
+    const task = await getPrintfulEstimateTask(env, taskId);
+
+    if (task === null) {
+      // 404 — task not ready yet, keep polling
+      continue;
+    }
+
+    if (task.status === 'completed') {
+      return task;
+    }
+
+    if (task.status === 'failed') {
+      const reasons = task.failure_reasons?.join(', ') || 'unknown';
+      throw new Error(`PRINTFUL_ESTIMATE_FAILED:${reasons}`);
+    }
+
+    // status is still 'processing' or similar — continue polling
+  }
+
+  throw new Error('PRINTFUL_ESTIMATE_TIMEOUT');
+}
+
+/**
+ * Enriches estimate order items with placement data (technique, dimensions, placeholder URL).
+ * This replicates the same placement logic used in submitPrintfulOrder but uses placeholder images.
+ */
+export async function enrichEstimateOrderItemsWithPlacements(
+  env: PrintfulEnv,
+  orderItems: Array<{ catalog_variant_id: number; external_id: string; quantity: number; retail_price?: string; name?: string }>
+): Promise<PrintfulEstimateOrderItem[]> {
+  const enriched: PrintfulEstimateOrderItem[] = [];
+
+  for (const item of orderItems) {
+    const variantId = String(item.catalog_variant_id);
+    const catalogVariantId = Number(variantId);
+    if (!Number.isFinite(catalogVariantId)) {
+      enriched.push({ source: 'catalog', ...item, catalog_variant_id: catalogVariantId });
+      continue;
+    }
+
+    // Look up catalog product id from the variant endpoint
+    const catalogProductId = await getCatalogProductIdForVariant({ env }, variantId);
+
+    // Default placement values
+    let placement: string = 'front';
+    let technique: string = 'dtfilm';
+    let width: number = 10;
+    let height: number = 10;
+
+    if (catalogProductId) {
+      const catalogProduct = await fetchCatalogProduct({ env }, catalogProductId);
+
+      if (catalogProduct?.placements) {
+        const frontPlacement = catalogProduct.placements.find((p) => p.placement === 'front')
+          ?? catalogProduct.placements[0];
+
+        if (frontPlacement) {
+          placement = frontPlacement.placement;
+          technique = frontPlacement.technique;
+
+          const dimensions = await fetchCatalogVariantPlacementDimensions({ env }, catalogProductId, catalogVariantId);
+          const frontDim = dimensions.find((d) => d.placement === frontPlacement.placement);
+
+          if (frontDim) {
+            width = frontDim.width;
+            height = frontDim.height;
+          }
+        }
+      }
+    }
+
+    // Build placeholder URL using placement dimensions
+    const placeholderUrl = `https://placehold.co/${width}x${height}.png`;
+
+    enriched.push({
+      source: 'catalog',
+      catalog_variant_id: catalogVariantId,
+      external_id: item.external_id,
+      quantity: item.quantity,
+      retail_price: item.retail_price,
+      name: item.name,
+      placements: [
+        {
+          placement,
+          technique,
+          print_area_type: 'simple',
+          layers: [
+            {
+              type: 'file',
+              url: placeholderUrl,
+              position: {
+                width,
+                height,
+                top: 0,
+                left: 0,
+              },
+            },
+          ],
+        },
+      ],
+    });
+  }
+
+  return enriched;
+}
+
+// ----------------------------------------------------------------------
 // Signed file URL helpers (HMAC-SHA256)
 // ----------------------------------------------------------------------
 
@@ -844,19 +1136,19 @@ export type PrintfulOrderResponse = {
 // Catalog API helpers (v2) — used for placement/technique/dimension lookup
 // ----------------------------------------------------------------------
 
-type CatalogProductPlacement = {
+export type CatalogProductPlacement = {
   placement: string;
   technique: string;
   layers: Array<{ type: string; layer_options?: Array<{ name: string; type: string }> }>;
 };
 
-type CatalogProductResponse = {
+export type CatalogProductResponse = {
   id: number;
   techniques: Array<{ key: string; display_name: string }>;
   placements: CatalogProductPlacement[];
 };
 
-type PlacementDimension = {
+export type PlacementDimension = {
   placement: string;
   height: number;
   width: number;
@@ -867,7 +1159,7 @@ type PlacementDimension = {
  * Fetches a catalog product's valid placements and techniques.
  * Used to determine correct placement keys and techniques for order items.
  */
-async function fetchCatalogProduct(c: { env: PrintfulEnv }, catalogProductId: string): Promise<CatalogProductResponse | null> {
+export async function fetchCatalogProduct(c: { env: PrintfulEnv }, catalogProductId: string): Promise<CatalogProductResponse | null> {
   const apiKey = c.env.PRINTFUL_API_KEY;
   if (!apiKey) return null;
 
@@ -890,7 +1182,7 @@ async function fetchCatalogProduct(c: { env: PrintfulEnv }, catalogProductId: st
  * Fetches placement dimensions for a specific catalog variant.
  * Returns the dimensions array so the caller can find the matching placement.
  */
-async function fetchCatalogVariantPlacementDimensions(
+export async function fetchCatalogVariantPlacementDimensions(
   c: { env: PrintfulEnv },
   catalogProductId: string,
   catalogVariantId: number
@@ -920,7 +1212,7 @@ async function fetchCatalogVariantPlacementDimensions(
  * Fetches a Printful catalog product id for a given variant id.
  * The Printful products list maps variant ids to their parent catalog product id.
  */
-async function getCatalogProductIdForVariant(c: { env: PrintfulEnv }, variantId: string): Promise<string | null> {
+export async function getCatalogProductIdForVariant(c: { env: PrintfulEnv }, variantId: string): Promise<string | null> {
   try {
     const v = await getPrintfulVariantById(c, variantId);
     return v.product_id ?? null;
