@@ -1467,7 +1467,7 @@ export async function submitPrintfulOrder(
     items,
   };
 
-  console.log(`Submitting Printful order ${JSON.stringify(payload)}`);
+  console.log(`Submitting Printful order ${JSON.stringify(payload, null, 2)}...`);
   // Call Printful v2 API
   const response = await fetch('https://api.printful.com/v2/orders', {
     method: 'POST',
