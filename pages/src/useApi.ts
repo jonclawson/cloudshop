@@ -287,8 +287,11 @@ export const productsApi = {
 };
 
 export const templatesApi = {
-  getPrintstudioTemplateConfig: (productId: string, variantId?: string | number) => {
-    const query = variantId !== undefined ? `?variant_id=${encodeURIComponent(String(variantId))}` : '';
+  getPrintstudioTemplateConfig: (productId: string, variantId?: string | number, technique?: string) => {
+    const params = new URLSearchParams();
+    if (variantId !== undefined) params.set('variant_id', String(variantId));
+    if (technique) params.set('technique', technique);
+    const query = params.toString() ? `?${params.toString()}` : '';
     return sendRequest<PrintstudioTemplateConfig>(`/api/products/${encodeURIComponent(productId)}/template${query}`);
   },
 };

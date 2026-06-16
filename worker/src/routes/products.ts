@@ -307,12 +307,13 @@ products.get('/:id', async (c) => {
 products.get('/:id/template', async (c) => {
   const id = c.req.param('id');
   const variantId = c.req.query('variant_id');
+  const technique = c.req.query('technique');
 
   try {
     const config = await getPrintstudioTemplateConfig(
       c,
       id,
-      variantId ? { variantId } : undefined
+      variantId || technique ? { variantId, technique } : undefined
     );
     return c.json(config);
   } catch (err) {

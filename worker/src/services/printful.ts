@@ -620,11 +620,12 @@ function mapToPrintstudioTemplateConfig(template: PrintfulMockupTemplate, printf
   };
 }
 
-export async function getPrintfulMockupTemplates(c: { env: PrintfulEnv }, catalogProductId: string): Promise<PrintfulMockupTemplate[]> {
+export async function getPrintfulMockupTemplates(c: { env: PrintfulEnv }, catalogProductId: string, technique?: string): Promise<PrintfulMockupTemplate[]> {
   const apiKey = c.env.PRINTFUL_API_KEY;
   if (!apiKey) throw new Error('MISSING_PRINTFUL_API_KEY');
 
   const url = new URL(`https://api.printful.com/v2/catalog-products/${encodeURIComponent(catalogProductId)}/mockup-templates`);
+  if (technique) url.searchParams.set('technique', technique);
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -692,10 +693,10 @@ export async function getPrintfulMockupGeneratorPrintfiles(
 export async function getPrintstudioTemplateConfig(
   c: { env: PrintfulEnv },
   catalogProductId: string,
-  opts?: { variantId?: string }
+  opts?: { variantId?: string; technique?: string }
 ): Promise<PrintstudioTemplateConfig> {
   const [templates, printfiles] = await Promise.all([
-    getPrintfulMockupTemplates(c, catalogProductId),
+    getPrintfulMockupTemplates(c, catalogProductId, opts?.technique),
     getPrintfulMockupGeneratorPrintfiles(c, catalogProductId),
   ]);
 
@@ -1389,9 +1390,10 @@ export async function submitPrintfulOrder(
     const catalogProductId = await getCatalogProductIdForVariant({ env }, variantId);
     console.log(`Mapped variant ID ${variantId} to catalog product ID ${catalogProductId}`);
 
+    const meta = orderItem.meta ? JSON.parse(orderItem.meta) : {};
     // Fetch placement info from the Catalog API (v2) rather than mockup-templates
     let placement: string = 'front';
-    let technique: string = 'dtfilm';
+    let technique: string = meta?.technique?.id || 'dtfilm';
     let width: number = 10;
     let height: number = 10;
 
@@ -1402,12 +1404,12 @@ export async function submitPrintfulOrder(
 
       if (catalogProduct?.placements) {
         // Find the front placement (or first available)
-        const frontPlacement = catalogProduct.placements.find((p) => p.placement === 'front')
+        const frontPlacement = catalogProduct.placements.find((p) => p.technique === technique && p.placement.includes('front'))
           ?? catalogProduct.placements[0];
 
         if (frontPlacement) {
           placement = frontPlacement.placement;
-          technique = frontPlacement.technique;
+          technique = technique ||frontPlacement.technique;
 
           // Fetch per-variant placement dimensions
           const dimensions = await fetchCatalogVariantPlacementDimensions({ env }, catalogProductId, catalogVariantId);
@@ -1465,6 +1467,7 @@ export async function submitPrintfulOrder(
     items,
   };
 
+  console.log(`Submitting Printful order ${JSON.stringify(payload)}`);
   // Call Printful v2 API
   const response = await fetch('https://api.printful.com/v2/orders', {
     method: 'POST',

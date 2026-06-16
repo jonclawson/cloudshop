@@ -182,7 +182,7 @@ export default function ProductPage() {
       setPrintStudioConfig(null);
 
       try {
-        const response = await templatesApi.getPrintstudioTemplateConfig(id, selectedVariant.id);
+        const response = await templatesApi.getPrintstudioTemplateConfig(id, selectedVariant.id, technique?.key);
         if (!cancelled) setPrintStudioConfig(response.data);
       } catch (err) {
         if (!cancelled) {
