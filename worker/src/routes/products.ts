@@ -315,6 +315,7 @@ products.get('/:id/template', async (c) => {
       id,
       variantId || technique ? { variantId, technique } : undefined
     );
+    console.log(`Fetched printstudio template config for product ${id}, variant ${variantId}, technique ${technique}: ${JSON.stringify(config, null, 2)}`);
     return c.json(config);
   } catch (err) {
     console.error('Failed to fetch printstudio template config:', err);

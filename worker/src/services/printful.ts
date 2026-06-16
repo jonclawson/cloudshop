@@ -528,6 +528,7 @@ export type PrintstudioTemplateConfig = {
 };
 
 type PrintfulMockupTemplate = {
+  template_id?: number;
   catalog_variant_ids?: number[];
   placement?: string;
   technique?: string;
@@ -576,11 +577,11 @@ function pickPrintfulMockupTemplate(templates: PrintfulMockupTemplate[], opts?: 
     if (matchedByVariant) return matchedByVariant;
   }
 
-  const matchedPrimaryFront = templates.find((t) => t.role === 'primary' && t.placement === 'front');
-  if (matchedPrimaryFront) return matchedPrimaryFront;
+  // const matchedPrimaryFront = templates.find((t) => t.role === 'primary' && t.placement === 'front');
+  // if (matchedPrimaryFront) return matchedPrimaryFront;
 
-  const matchedPrimary = templates.find((t) => t.role === 'primary');
-  if (matchedPrimary) return matchedPrimary;
+  // const matchedPrimary = templates.find((t) => t.role === 'primary');
+  // if (matchedPrimary) return matchedPrimary;
 
   const matchedFront = templates.find((t) => t.placement === 'front');
   if (matchedFront) return matchedFront;
@@ -620,12 +621,15 @@ function mapToPrintstudioTemplateConfig(template: PrintfulMockupTemplate, printf
   };
 }
 
-export async function getPrintfulMockupTemplates(c: { env: PrintfulEnv }, catalogProductId: string, technique?: string): Promise<PrintfulMockupTemplate[]> {
+export async function getPrintfulMockupTemplates(c: { env: PrintfulEnv }, catalogProductId: string, opts?: {variantId?: string, technique?: string}): Promise<PrintfulMockupTemplate[]> {
   const apiKey = c.env.PRINTFUL_API_KEY;
   if (!apiKey) throw new Error('MISSING_PRINTFUL_API_KEY');
 
-  const url = new URL(`https://api.printful.com/v2/catalog-products/${encodeURIComponent(catalogProductId)}/mockup-templates`);
-  if (technique) url.searchParams.set('technique', technique);
+  // const url = new URL(`https://api.printful.com/v2/catalog-products/${encodeURIComponent(catalogProductId)}/mockup-templates`);
+  const url = new URL(`https://api.printful.com/mockup-generator/templates/${catalogProductId}`);
+
+  if (opts?.technique) url.searchParams.set('technique', opts.technique);
+  console.log(`Fetching Printful mockup templates from ${url.toString()}...`);
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -640,17 +644,37 @@ export async function getPrintfulMockupTemplates(c: { env: PrintfulEnv }, catalo
     throw new Error(`PRINTFUL_MOCKUP_TEMPLATES_FAILED:${response.status}:${text.slice(0, 200)}`);
   }
 
-  const body = (await response.json()) as { data?: unknown };
-  const rawData = body.data;
+  // const body = (await response.json()) as { data?: unknown };
+  // const rawData = body.data;
 
-  if (!Array.isArray(rawData)) return [];
+  // if (!Array.isArray(rawData)) return [];
 
-  const templates: PrintfulMockupTemplate[] = rawData
-    .filter((t) => typeof t === 'object' && t !== null)
-    .map((t) => t as unknown as PrintfulMockupTemplate)
-    .filter((t) => typeof t.printfile_id === 'number');
+  // const templates: PrintfulMockupTemplate[] = rawData
+  //   .filter((t) => typeof t === 'object' && t !== null)
+  //   .map((t) => t as unknown as PrintfulMockupTemplate)
+  //   .filter((t) => typeof t.printfile_id === 'number');
 
-  return templates;
+  // return templates;
+  const body = (await response.json()) as { result?: { 
+    variant_mapping: Array<{ variant_id: number; templates: Array<{ placement: string; template_id: number }> }>;
+    templates: Array<{ template_id: number; image_url: string; }>;
+  }};
+  const result = body.result;
+  if (!result) return [];
+
+  const { variant_mapping, templates } = result;
+
+  // If a variantId is specified, filter templates to only those matching that variant
+  if (opts?.variantId) {
+    const variantNum = Number(opts.variantId);
+    const mapping = variant_mapping.find(m => m.variant_id === variantNum);
+   if (!mapping) return [];
+
+    const templateIds = new Set(mapping.templates.map(t => t.template_id));
+    return templates.filter(t => templateIds.has(t.template_id)) as PrintfulMockupTemplate[];
+  }
+  
+  return templates as PrintfulMockupTemplate[]
 }
 
 export async function getPrintfulMockupGeneratorPrintfiles(
@@ -696,11 +720,12 @@ export async function getPrintstudioTemplateConfig(
   opts?: { variantId?: string; technique?: string }
 ): Promise<PrintstudioTemplateConfig> {
   const [templates, printfiles] = await Promise.all([
-    getPrintfulMockupTemplates(c, catalogProductId, opts?.technique),
+    getPrintfulMockupTemplates(c, catalogProductId, opts),
     getPrintfulMockupGeneratorPrintfiles(c, catalogProductId),
   ]);
 
   const template = pickPrintfulMockupTemplate(templates, opts);
+  console.log(`Picked Printful mockup template for product ${catalogProductId}, variant ${opts?.variantId}, technique ${opts?.technique}: ${JSON.stringify(template, null, 2)}`);
   return mapToPrintstudioTemplateConfig(template, printfiles);
 }
 
