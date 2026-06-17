@@ -51,7 +51,9 @@ export default function PrintfulEstimate({
           order_items: orderItems,
           retail_costs: retailCosts,
         });
-        onGetEstimate(response.data)
+        if (onGetEstimate) {
+          onGetEstimate(response.data)
+        }
         setEstimate(response.data);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to get estimate';
@@ -101,7 +103,7 @@ export default function PrintfulEstimate({
   if (mode === 'auto') {
     return (
       <div className="mt-4 border-t border-gray-200 pt-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Shipping Estimate</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">Total Costs</h3>
         {loading && (
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -218,7 +220,7 @@ function EstimateBreakdown({ costs }: { costs: PrintfulEstimateResponse['costs']
 
   return (
     <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm">
-      <h4 className="font-semibold text-gray-700 mb-2">Shipping Estimate</h4>
+      <h4 className="font-semibold text-gray-700 mb-2">Cost</h4>
       <div className="space-y-1">
         {rows.map((row) => (
           <div key={row.label} className="flex justify-between">

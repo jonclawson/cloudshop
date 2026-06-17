@@ -303,7 +303,7 @@ export default function CheckoutPage() {
           </div>
 
           <div className="mt-5 pt-4 border-t border-gray-200 flex items-center justify-between">
-            <span className="font-semibold">Total</span>
+            <span className="font-semibold">Subtotal</span>
             <span className="font-semibold">{formattedTotalPrice}</span>
           </div>
 
@@ -434,8 +434,10 @@ export default function CheckoutPage() {
           )}
         </div>
 
-        <div className="rounded-md border border-gray-200 bg-white p-4 text-center">
-          {estimate && 'You pay: ' + estimate.costs.total}
+        <div className="text-bold flex justify-between rounded-md border border-gray-200 bg-white p-4 text-center">
+          {estimate && (<>
+           <div className="text-bold">Total</div> <div >{estimate.costs.total}</div>
+            </>)}
         </div>
 
         <div className="p-4">
