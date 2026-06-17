@@ -128,6 +128,11 @@ type AddressInput = {
 };
 
 export default function CheckoutPage() {
+  const currencyFormatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  });
+
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
 
@@ -436,11 +441,11 @@ export default function CheckoutPage() {
 
         <div className="text-bold flex justify-between rounded-md border border-gray-200 bg-white p-4 text-center">
           {estimate && (<>
-           <div className="text-bold">Total</div> <div >{estimate.costs.total}</div>
+           <div className="text-bold">Total</div> <div >{currencyFormatter.format(Number(estimate.costs.total))}</div>
             </>)}
         </div>
 
-        <div className="p-4">
+        <div className="">
           <button
             disabled={processing || items.length === 0 || !emailValid || !estimate}
             onClick={async () => {
@@ -605,7 +610,7 @@ export default function CheckoutPage() {
                 setProcessing(false);
               }
             }}
-            className="mt-8 w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className=" w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {processing ? 'Processing...' : 'Complete Purchase'}
           </button>
