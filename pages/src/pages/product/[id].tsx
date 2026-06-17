@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import PrintStudio from 'printstudio';
 import 'printstudio/dist/printstudio.css';
@@ -159,6 +159,14 @@ export default function ProductPage() {
       currency: 'USD',
     }).format(price);
   }, [selectedVariant]);
+
+    const variantPriceLabel = useCallback((price: number = 0) => {
+    // const price = selectedVariant?.price ?? 0;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(price);
+  }, [product]);
 
   const priceInCents = useMemo(
     () => Math.round((selectedVariant?.price ?? 0) * 100),
@@ -379,7 +387,7 @@ export default function ProductPage() {
                 >
                   {product.variants.map((variant) => (
                     <option key={variant.id} value={variant.id}>
-                      {variant.title || `${variant.size} / ${variant.color}`} - {priceLabel}
+                      {variant.title || `${variant.size} / ${variant.color}`} - {variantPriceLabel(variant.price)}
                     </option>
                   ))}
                 </select>
