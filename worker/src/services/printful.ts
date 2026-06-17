@@ -1,6 +1,6 @@
 import { mockPrintful } from './mock';
 import { generateR2PresignedUrl } from './r2PresignedUrl';
-
+const MARKUP = 0.1;
 const techniqueKeys = [
     "cut-sew",
     "digital",
@@ -78,7 +78,7 @@ function normalizeMoneyToDollars(value: unknown): number {
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) return 0;
     if (Number.isInteger(value) && value > 1000) return value / 100;
-    return value;
+    return MARKUP * value + value;
   }
 
   if (typeof value === 'string') {
@@ -86,7 +86,7 @@ function normalizeMoneyToDollars(value: unknown): number {
     if (!Number.isFinite(parsed)) return 0;
     // If Printful ever returns "1999" (cents), we can still handle it.
     if (Number.isInteger(parsed) && parsed > 1000) return parsed / 100;
-    return parsed;
+    return MARKUP * parsed + parsed;
   }
 
   return 0;
@@ -906,6 +906,8 @@ export async function getPrintfulEstimateTask(
     throw new Error('PRINTFUL_ESTIMATE_INVALID_RESPONSE');
   }
 
+  console.log('printulf estimate', JSON.stringify(task, null, 2))
+
   return task;
 }
 
@@ -934,6 +936,25 @@ export async function createAndPollPrintfulEstimate(
     }
 
     if (task.status === 'completed') {
+      const c = task.costs;
+      const origSubtotal = +c.subtotal;
+      const markup = 1 + MARKUP; // 1.10
+
+      c.subtotal = String(origSubtotal * markup);
+      c.tax = String(+c.tax * markup);
+      if (c.vat) c.vat = String(+c.vat * markup);
+
+      c.total = String(
+        +c.subtotal +
+        +c.shipping +
+        +c.digitization +
+        +c.additional_fee +
+        +c.fulfillment_fee +
+        +c.retail_delivery_fee +
+        +c.vat +
+        +c.tax -
+        +c.discount
+      );
       return task;
     }
 
