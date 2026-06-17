@@ -8,6 +8,7 @@ type PrintfulEstimateProps = {
     quantity: number;
     retail_price?: string;
     name?: string;
+    technique?: string
   }>;
   retailCosts?: {
     currency?: string;

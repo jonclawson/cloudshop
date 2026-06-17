@@ -257,6 +257,7 @@ export const authApi = {
 };
 
 export type PrintstudioTemplateConfig = {
+  placement: string;
   template_width: number;
   template_height: number;
   print_area_width: number;
@@ -267,6 +268,11 @@ export type PrintstudioTemplateConfig = {
   image_url: string;
   background_color?: string | null;
 
+  orientation?: string;
+
+  /**
+   * Target export dimensions (from api/mockup-generator/printfiles/*)
+   */
   printfile_width: number;
   printfile_height: number;
   printfile_dpi: number;

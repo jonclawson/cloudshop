@@ -4,7 +4,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { AddressElement, Elements, PaymentElement } from '@stripe/react-stripe-js';
 
 import { useAuth } from '../AuthContext';
-import { ordersApi, uploadsApi } from '../useApi';
+import { ordersApi, PrintstudioTemplateConfig, uploadsApi } from '../useApi';
 import PrintfulEstimate from '../components/PrintfulEstimate';
 import { useShoppingCart } from 'use-shopping-cart';
 import { deleteManyPrintAssets, getPrintFileBlob } from '../printAssetsIdb';
@@ -25,8 +25,9 @@ type CartLine = {
 type CartLineWithUploads = CartLine & {
   image?: string; // thumb data URL (from product page)
   printAssetKey?: string; // IDB key for print file
-  technique?: string;
+  technique?:  {key: string; display_name: string; is_default: boolean};
   options?: Record<string, string>;
+  template?: PrintstudioTemplateConfig
 };
 
 function isValidEmail(email: string): boolean {
@@ -157,7 +158,33 @@ export default function CheckoutPage() {
       quantity: item.quantity,
       price: item.price,
       currency: item.currency,
-      meta: JSON.stringify({ technique: item.technique, options: item.options }), // Include extra meta for display in order summary
+      meta: JSON.stringify({ 
+        technique: item.technique, 
+        options: item.options,
+        placements: [
+        {
+          placement: item?.template?.placement || 'front',
+          technique: item?.technique?.key,
+          print_area_type: 'simple',
+          layers: [
+            {
+              type: 'file',
+              url: "​",
+              layer_options: [], // todo: use options
+              position: {
+                width: item?.template?.printfile_width && item?.template?.printfile_dpi && (item?.template?.printfile_width / item?.template?.printfile_dpi) || 10,
+                height: item?.template?.printfile_height && item?.template?.printfile_dpi && (item?.template?.printfile_height / item?.template?.printfile_dpi) || 10,
+                top: 0,
+                left: 0
+              }
+            }
+          ],
+          placement_options: [] // todo: use options
+        }
+        ],
+        orientation: item.template?.orientation,
+        product_options: [], // todo: use options
+      }), // Include extra meta for display in order summary
     })) satisfies CartLine[];
   }, [items]);
 
@@ -170,6 +197,7 @@ export default function CheckoutPage() {
         quantity: item.quantity,
         retail_price: (item.price / 100).toFixed(2),
         name: item.name,
+        technique: item.technique?.key,
       }));
   }, [items]);
 

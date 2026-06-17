@@ -509,6 +509,7 @@ export async function getPrintfulProductById(c: { env: PrintfulEnv }, id: string
 }
 
 export type PrintstudioTemplateConfig = {
+  placement: string;
   template_width: number;
   template_height: number;
   print_area_width: number;
@@ -518,6 +519,8 @@ export type PrintstudioTemplateConfig = {
 
   image_url: string;
   background_color?: string | null;
+
+  orientation?: string;
 
   /**
    * Target export dimensions (from api/mockup-generator/printfiles/*)
@@ -604,6 +607,7 @@ function mapToPrintstudioTemplateConfig(template: PrintfulMockupTemplate, printf
   }
 
   return {
+    placement: template.placement,
     template_width: template.template_width,
     template_height: template.template_height,
 
@@ -614,6 +618,8 @@ function mapToPrintstudioTemplateConfig(template: PrintfulMockupTemplate, printf
 
     image_url,
     background_color: template.background_color ?? null,
+
+    orientation: template.orientation,
 
     printfile_width: matchedPrintfile.width,
     printfile_height: matchedPrintfile.height,
@@ -657,7 +663,7 @@ export async function getPrintfulMockupTemplates(c: { env: PrintfulEnv }, catalo
   // return templates;
   const body = (await response.json()) as { result?: { 
     variant_mapping: Array<{ variant_id: number; templates: Array<{ placement: string; template_id: number }> }>;
-    templates: Array<{ template_id: number; image_url: string; }>;
+    templates: Array<{ template_id: number; image_url: string; placement?: string }>;
   }};
   const result = body.result;
   if (!result) return [];
@@ -671,7 +677,11 @@ export async function getPrintfulMockupTemplates(c: { env: PrintfulEnv }, catalo
    if (!mapping) return [];
 
     const templateIds = new Set(mapping.templates.map(t => t.template_id));
-    return templates.filter(t => templateIds.has(t.template_id)) as PrintfulMockupTemplate[];
+    return templates.filter(t => templateIds.has(t.template_id))
+    .map(t => {
+      t.placement = mapping.templates.find(mt => mt.template_id === t.template_id).placement;
+      return t;
+    }) as PrintfulMockupTemplate[];
   }
   
   return templates as PrintfulMockupTemplate[]
@@ -944,7 +954,7 @@ export async function createAndPollPrintfulEstimate(
  */
 export async function enrichEstimateOrderItemsWithPlacements(
   env: PrintfulEnv,
-  orderItems: Array<{ catalog_variant_id: number; external_id: string; quantity: number; retail_price?: string; name?: string }>
+  orderItems: Array<{ catalog_variant_id: number; external_id: string; quantity: number; retail_price?: string; name?: string, technique?: string }>
 ): Promise<PrintfulEstimateOrderItem[]> {
   const enriched: PrintfulEstimateOrderItem[] = [];
 
@@ -961,7 +971,7 @@ export async function enrichEstimateOrderItemsWithPlacements(
 
     // Default placement values
     let placement: string = 'front';
-    let technique: string = 'dtfilm';
+    let technique: string = item.technique || 'dtfilm';
     let width: number = 10;
     let height: number = 10;
 
@@ -974,7 +984,7 @@ export async function enrichEstimateOrderItemsWithPlacements(
 
         if (frontPlacement) {
           placement = frontPlacement.placement;
-          technique = frontPlacement.technique;
+          technique = technique || frontPlacement.technique;
 
           const dimensions = await fetchCatalogVariantPlacementDimensions({ env }, catalogProductId, catalogVariantId);
           const frontDim = dimensions.find((d) => d.placement === frontPlacement.placement);
@@ -1416,39 +1426,7 @@ export async function submitPrintfulOrder(
     console.log(`Mapped variant ID ${variantId} to catalog product ID ${catalogProductId}`);
 
     const meta = orderItem.meta ? JSON.parse(orderItem.meta) : {};
-    // Fetch placement info from the Catalog API (v2) rather than mockup-templates
-    let placement: string = 'front';
-    let technique: string = meta?.technique?.id || 'dtfilm';
-    let width: number = 10;
-    let height: number = 10;
-
-    if (catalogProductId) {
-      // Fetch the catalog product to get valid placements and techniques
-      const catalogProduct = await fetchCatalogProduct({ env }, catalogProductId);
-      console.log(`Fetched catalog product ${catalogProductId}:`, catalogProduct ? `${catalogProduct.placements?.length ?? 0} placements` : 'null');
-
-      if (catalogProduct?.placements) {
-        // Find the front placement (or first available)
-        const frontPlacement = catalogProduct.placements.find((p) => p.technique === technique && p.placement.includes('front'))
-          ?? catalogProduct.placements[0];
-
-        if (frontPlacement) {
-          placement = frontPlacement.placement;
-          technique = technique ||frontPlacement.technique;
-
-          // Fetch per-variant placement dimensions
-          const dimensions = await fetchCatalogVariantPlacementDimensions({ env }, catalogProductId, catalogVariantId);
-          const frontDim = dimensions.find((d) => d.placement === frontPlacement.placement);
-          console.log(`Placement dimensions for variant ${catalogVariantId}, placement ${frontPlacement.placement}:`, frontDim ?? 'none');
-
-          if (frontDim) {
-            width = frontDim.width;
-            height = frontDim.height;
-          }
-        }
-      }
-    }
-
+    
     items.push({
       source: 'catalog',
       catalog_variant_id: catalogVariantId,
@@ -1457,16 +1435,16 @@ export async function submitPrintfulOrder(
       retail_price: orderItem.price_at_purchase.toFixed(2),
       placements: [
         {
-          placement,
-          technique,
+          placement: meta.placements[0].placement,
+          technique: meta.placements[0].technique,
           print_area_type: 'simple',
           layers: [
             {
               type: 'file',
               url: signedUrl,
               position: {
-                width,
-                height,
+                width: meta.placements[0].layers[0].position.width,
+                height: meta.placements[0].layers[0].position.height,
                 top: 0,
                 left: 0,
               },
@@ -1474,6 +1452,7 @@ export async function submitPrintfulOrder(
           ],
         },
       ],
+      orientation: meta.orientation,
     });
   }
 

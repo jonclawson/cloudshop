@@ -285,9 +285,11 @@ export default function ProductPage() {
       // IMPORTANT: thumb (data URL) is stored here for cart display.
       image: thumbDataUrl,
 
-      technique: technique?.key,
+      technique,
 
       options,
+
+      template: printStudioConfig,
 
       // These extra fields will be used by cart/cleanup later.
       printAssetKey: printAssetKey ?? undefined,
@@ -474,6 +476,7 @@ export default function ProductPage() {
                     quantity: 1,
                     retail_price: selectedVariant.price.toFixed(2),
                     name: displayName,
+                    technique: technique?.key
                   },
                 ]}
                 retailCosts={{

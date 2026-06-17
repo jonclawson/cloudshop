@@ -13,6 +13,7 @@ type CartItemWithExtras = {
   quantity: number;
   formattedValue: string;
   image?: string;
+  technique?: {key: string; display_name: string; is_default: boolean};
 
   // extra fields we added on addItem()
   printAssetKey?: string;
@@ -91,6 +92,7 @@ export default function CartPage() {
         quantity: item.quantity,
         retail_price: ((item as any).price / 100).toFixed(2),
         name: item.name,
+        technique: item.technique?.key
       }));
   }, [items]);
 
