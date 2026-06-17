@@ -22,6 +22,7 @@ type PrintfulEstimateProps = {
     country_code?: string;
     zip?: string;
   };
+  onGetEstimate?: Function
 };
 
 export default function PrintfulEstimate({
@@ -29,6 +30,7 @@ export default function PrintfulEstimate({
   retailCosts,
   mode,
   shippingAddress,
+  onGetEstimate,
 }: PrintfulEstimateProps) {
   const [showZipInput, setShowZipInput] = useState(false);
   const [zip, setZip] = useState('');
@@ -49,6 +51,7 @@ export default function PrintfulEstimate({
           order_items: orderItems,
           retail_costs: retailCosts,
         });
+        onGetEstimate(response.data)
         setEstimate(response.data);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to get estimate';

@@ -4,7 +4,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { AddressElement, Elements, PaymentElement } from '@stripe/react-stripe-js';
 
 import { useAuth } from '../AuthContext';
-import { ordersApi, PrintstudioTemplateConfig, uploadsApi } from '../useApi';
+import { ordersApi, PrintfulEstimateResponse, PrintstudioTemplateConfig, uploadsApi } from '../useApi';
 import PrintfulEstimate from '../components/PrintfulEstimate';
 import { useShoppingCart } from 'use-shopping-cart';
 import { deleteManyPrintAssets, getPrintFileBlob } from '../printAssetsIdb';
@@ -140,6 +140,8 @@ export default function CheckoutPage() {
   const [billingAddress, setBillingAddress] = useState<AddressInput | null>(null);
   const [shippingAddress, setShippingAddress] = useState<AddressInput | null>(null);
 
+  const [estimate, setEstimate] = useState<PrintfulEstimateResponse | null>(null);
+
   useEffect(() => {
     if (user?.email) {
       setEmail(user.email);
@@ -266,6 +268,11 @@ export default function CheckoutPage() {
     };
   }, [stripePublishableKey, emailValid, email, items.length, totalAmountCents, currency]);
 
+  const onGetEstimate = (estimate: PrintfulEstimateResponse) => {
+    setEstimate(estimate);
+    return null;
+  }
+
   return (
     <div className="main-class">
       <h1 className="text-3xl font-bold mb-8">Checkout</h1>
@@ -305,6 +312,7 @@ export default function CheckoutPage() {
               mode="auto"
               orderItems={orderItemsForEstimate}
               shippingAddress={shippingAddressForEstimate}
+              onGetEstimate={onGetEstimate}
             />
           )}
 
@@ -426,9 +434,13 @@ export default function CheckoutPage() {
           )}
         </div>
 
+        <div className="rounded-md border border-gray-200 bg-white p-4 text-center">
+          {estimate && 'You pay: ' + estimate.costs.total}
+        </div>
+
         <div className="p-4">
           <button
-            disabled={processing || items.length === 0 || !emailValid}
+            disabled={processing || items.length === 0 || !emailValid || !estimate}
             onClick={async () => {
               setError('');
               setProcessing(true);
