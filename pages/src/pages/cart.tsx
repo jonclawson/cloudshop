@@ -189,20 +189,20 @@ export default function CartPage() {
             ))}
           </div>
 
-          {cartItemsForEstimate.length > 0 && (
-            <div className="rounded-lg border border-gray-200 p-6">
+
+
+          <div className="rounded-lg border border-gray-200 p-6">
+            <div className="flex items-center justify-between text-lg font-semibold">
+              <span>Subtotal</span>
+              <span>{formattedTotalPrice}</span>
+            </div>
+
+          {cartItemsForEstimate.length > 0 && (<>
               <PrintfulEstimate
                 mode="manual"
                 orderItems={cartItemsForEstimate}
               />
-            </div>
-          )}
-
-          <div className="rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between text-lg font-semibold">
-              <span>Total</span>
-              <span>{formattedTotalPrice}</span>
-            </div>
+         </> )}
 
             <button
               type="button"
