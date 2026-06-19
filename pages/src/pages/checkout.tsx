@@ -372,7 +372,9 @@ export default function CheckoutPage() {
               )}
 
               {!stripeUiLoading && stripeClientSecret && stripePromise && (
-                <Elements stripe={stripePromise} options={{ clientSecret: stripeClientSecret }}>
+                <Elements 
+                stripe={stripePromise} 
+                options={{ clientSecret: stripeClientSecret }}>
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <div className="text-sm font-semibold">Billing address</div>
@@ -416,7 +418,15 @@ export default function CheckoutPage() {
 
                     <div className="space-y-2">
                       <div className="text-sm font-semibold">Payment info</div>
-                      <PaymentElement options={{ layout: 'tabs' }} />
+                      <PaymentElement 
+                      options={{ 
+                        layout: 'tabs', 
+                        wallets: {
+                          link: 'never', 
+                          googlePay: 'auto',
+                        },
+                        paymentMethodOrder: ['card', 'us_bank_account']
+                        }} />
                     </div>
                   </div>
                 </Elements>

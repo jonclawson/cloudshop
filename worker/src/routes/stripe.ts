@@ -60,6 +60,7 @@ stripeRoutes.post('/payment-intent-ui', async (c) => {
       receipt_email: receiptEmailString,
       // Enable multiple methods (incl. PayPal when configured in Stripe dashboard)
       automatic_payment_methods: { enabled: true },
+      // payment_method_types: ['card', 'us_bank_account'],
       metadata: {
         // Not perfect because frontend render-only call doesn't include order_id yet,
         // but having some metadata makes debugging simpler.
