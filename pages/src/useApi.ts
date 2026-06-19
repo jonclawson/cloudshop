@@ -366,7 +366,7 @@ export const ordersApi = {
 
   create: (
     items: unknown[],
-    addresses: { billing_address?: AddressInput; shipping_address?: AddressInput },
+    addresses: { billing_address?: AddressInput; shipping_address?: AddressInput; stripe_payment_id?: string },
     email: string
   ) =>
     sendRequest<unknown>(`/api/orders`, {

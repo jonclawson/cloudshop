@@ -64,7 +64,10 @@ export default function PrintfulEstimate({
     },
     [orderItems, retailCosts]
   );
-
+  // Reset auto-trigger when items change so estimate recalculates
+  useEffect(() => {
+    autoTriggeredRef.current = false;
+  }, [orderItems, retailCosts]);
   // Auto mode: trigger when all shipping fields are present
   useEffect(() => {
     if (mode !== 'auto') return;
@@ -84,7 +87,7 @@ export default function PrintfulEstimate({
     } else {
       autoTriggeredRef.current = false;
     }
-  }, [mode, shippingAddress, fetchEstimate]);
+  }, [mode, shippingAddress]);
 
   // Manual mode: trigger when a 5-digit zip is entered
   const handleZipChange = (e: React.ChangeEvent<HTMLInputElement>) => {

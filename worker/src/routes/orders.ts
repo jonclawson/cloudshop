@@ -55,6 +55,7 @@ type CreateOrderBody = {
   email?: string;
   billing_address?: AddressInput;
   shipping_address?: AddressInput;
+  stripe_payment_id?: string;
 };
 
 function toMoneyDollarsFromCents(cents: number): number {
@@ -357,7 +358,7 @@ orders.post('/', optionalAuth, async (c) => {
     await db.insert(schema.orders).values({
       id: orderId,
       user_id: userId,
-      stripe_payment_id: 'pi_stub',
+      stripe_payment_id: body.stripe_payment_id || 'pi_stub',
       status: 'pending',
       total_price: totalPrice,
       printful_order_id: null,

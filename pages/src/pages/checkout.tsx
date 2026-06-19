@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
-import { AddressElement, Elements, PaymentElement } from '@stripe/react-stripe-js';
+import { AddressElement, Elements, ElementsConsumer, PaymentElement } from '@stripe/react-stripe-js';
+import type { Stripe, StripeElements } from '@stripe/stripe-js';
 
 import { useAuth } from '../AuthContext';
 import { ordersApi, PrintfulEstimateResponse, PrintstudioTemplateConfig, uploadsApi } from '../useApi';
@@ -127,6 +128,12 @@ type AddressInput = {
   country?: string;
 };
 
+/** Parse a dollar string like "35.00" to integer cents (3500). */
+function dollarsToCents(dollars: string | number): number {
+  const num = typeof dollars === 'string' ? parseFloat(dollars) : dollars;
+  return Math.round(num * 100);
+}
+
 export default function CheckoutPage() {
   const currencyFormatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -146,6 +153,9 @@ export default function CheckoutPage() {
   const [shippingAddress, setShippingAddress] = useState<AddressInput | null>(null);
 
   const [estimate, setEstimate] = useState<PrintfulEstimateResponse | null>(null);
+
+  // Track whether the PaymentElement (card form) is fully filled and valid
+  const [paymentElementComplete, setPaymentElementComplete] = useState(false);
 
   useEffect(() => {
     if (user?.email) {
@@ -226,9 +236,18 @@ export default function CheckoutPage() {
     return loadStripe(stripePublishableKey);
   }, [stripePublishableKey]);
 
-  const totalAmountCents = useMemo(() => {
-    return items.reduce((sum, line) => sum + line.price * line.quantity, 0);
-  }, [items]);
+  // Amount to charge:
+  //   1. Estimate total (with shipping/tax) once available
+  //   2. 100 cents bootstrap amount on first render so Stripe Elements load
+  //      (the PaymentIntent amount will be updated when the estimate arrives)
+  // The user is never charged the bootstrap amount — confirmPayment only fires
+  // after the estimate is loaded and button is clicked.
+  const chargeAmountCents = useMemo(() => {
+    if (estimate?.costs?.total) {
+      return dollarsToCents(estimate.costs.total);
+    }
+    return 100; // $1.00 bootstrap so Elements render before estimate arrives
+  }, [estimate]);
 
   const currency = useMemo(() => {
     return items[0]?.currency ?? 'usd';
@@ -238,6 +257,9 @@ export default function CheckoutPage() {
   const [stripeUiError, setStripeUiError] = useState<string>('');
   const [stripeUiLoading, setStripeUiLoading] = useState(false);
 
+  // Re-fetch client secret when the charge amount changes (e.g. when estimate arrives).
+  // Stripe's <Elements> component handles clientSecret updates gracefully - it updates the
+  // PaymentIntent internally without unmounting/remounting the child Elements.
   useEffect(() => {
     let cancelled = false;
 
@@ -245,14 +267,21 @@ export default function CheckoutPage() {
       if (!stripePublishableKey) return;
       if (!emailValid) return;
       if (items.length === 0) return;
-      if (!Number.isFinite(totalAmountCents) || totalAmountCents <= 0) return;
+      if (chargeAmountCents == null || !Number.isFinite(chargeAmountCents) || chargeAmountCents <= 0) return;
+
+      const amount: number = chargeAmountCents;
 
       setStripeUiError('');
-      setStripeUiLoading(true);
+
+      // Only show loading indicator if we don't already have a client secret
+      // (first load). On subsequent updates (e.g. estimate arrives), don't show
+      // the loading overlay since Elements is already rendered.
+      const isFirstLoad = !stripeClientSecret;
+      if (isFirstLoad) setStripeUiLoading(true);
 
       try {
         const clientSecret = await createPaymentIntentUiClientSecret({
-          amountCents: totalAmountCents,
+          amountCents: amount,
           currency: currency.toLowerCase(),
           receiptEmail: email.trim(),
         });
@@ -262,7 +291,7 @@ export default function CheckoutPage() {
         const message = e instanceof Error ? e.message : 'Failed to load Stripe UI';
         if (!cancelled) setStripeUiError(message);
       } finally {
-        if (!cancelled) setStripeUiLoading(false);
+        if (!cancelled && isFirstLoad) setStripeUiLoading(false);
       }
     };
 
@@ -271,12 +300,208 @@ export default function CheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [stripePublishableKey, emailValid, email, items.length, totalAmountCents, currency]);
+  }, [stripePublishableKey, emailValid, items.length, chargeAmountCents, currency, email]);
 
   const onGetEstimate = (estimate: PrintfulEstimateResponse) => {
     setEstimate(estimate);
     return null;
   }
+
+  const handleCompletePurchase = async (
+    stripe: Stripe,
+    elements: StripeElements
+  ) => {
+    setError('');
+    setProcessing(true);
+
+    try {
+      // Step 1: Confirm the Stripe payment
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        redirect: 'if_required',
+      });
+
+      if (confirmError) {
+        throw new Error(confirmError.message || 'Payment failed');
+      }
+
+      if (!paymentIntent) {
+        throw new Error('Payment intent missing after confirmation');
+      }
+
+      // Step 2: Create order + order_items with the real payment intent id
+      const response = await ordersApi.create(
+        orderSummaryLines,
+        {
+          billing_address: billingAddress ?? undefined,
+          shipping_address: shippingAddress ?? undefined,
+          stripe_payment_id: paymentIntent.id,
+        },
+        email.trim()
+      );
+      const data = response.data as {
+        order_id?: string;
+        order_item_ids?: string[];
+        confirmation_number?: string;
+        access_token?: string;
+        refresh_token?: string;
+        user?: { id: string; email: string | null };
+      };
+
+      const orderId = data.order_id;
+      const orderItemIds = data.order_item_ids;
+
+      if (!orderId || !orderItemIds || orderItemIds.length !== items.length) {
+        throw new Error('Checkout failed: missing order ids');
+      }
+
+      // Ensure uploads + linking endpoints can auth immediately.
+      if (data.access_token && data.refresh_token && data.user) {
+        localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+
+        localStorage.setItem(
+          USER_KEY,
+          JSON.stringify({ id: data.user.id, email: data.user.email ?? '' })
+        );
+
+        setUser({
+          id: data.user.id,
+          email: data.user.email ?? '',
+          admin: false,
+        });
+      }
+
+      // 3) Upload thumb + printfile for each cart line
+      const thumbUploadsAndPrintUploads = await Promise.all(
+        items.map(async (cartLine, idx) => {
+          // If there is no print asset key, we do NOTHING for this cart line
+          // (no thumb upload, no print upload, no linking for it).
+          const printAssetKey = cartLine.printAssetKey;
+          if (!printAssetKey) {
+            return null;
+          }
+
+          const thumbDataUrl = cartLine.image;
+          if (!thumbDataUrl) {
+            throw new Error(`Missing thumb for cart item ${idx + 1}`);
+          }
+
+          // "Optimal size": resize only when the thumb is a data URL.
+          // The fallback thumb (remote URL) can fail due to CORS, so we upload it as-is.
+          let thumbFile: File;
+
+          if (thumbDataUrl.startsWith('data:')) {
+            const thumbBlobResized = await dataUrlToResizedBlob(
+              thumbDataUrl,
+              512,
+              'image/jpeg',
+              0.85
+            );
+            thumbFile = new File(
+              [thumbBlobResized],
+              `thumb-${orderItemIds[idx]}.jpg`,
+              { type: 'image/jpeg' }
+            );
+          } else {
+            // Remote fallback thumb URLs can trigger CORS failures when fetched in-browser.
+            // Proxy through our worker so the browser sees same-origin responses.
+            const proxiedUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(thumbDataUrl)}`;
+            const thumbResp = await fetch(proxiedUrl);
+            const thumbBlob = await thumbResp.blob();
+            thumbFile = new File(
+              [thumbBlob],
+              `thumb-${orderItemIds[idx]}`,
+              { type: thumbBlob.type || 'application/octet-stream' }
+            );
+          }
+
+          const printBlob = await getPrintFileBlob(printAssetKey);
+          if (!printBlob) {
+            throw new Error(`Printfile missing from IndexedDB for cart item ${idx + 1}`);
+          }
+
+          // Name/extension for print file: keep as-is (type may vary).
+          const printFile = new File([printBlob], `print-${orderItemIds[idx]}`, {
+            type: printBlob.type || 'application/octet-stream',
+          });
+
+          const [thumbUpload, printUpload] = await Promise.all([
+            uploadsApi.create(thumbFile, 'thumb'),
+            uploadsApi.create(printFile, 'print'),
+          ]);
+
+          const thumbUploadData = thumbUpload.data as { user_upload_id?: string };
+          const printUploadData = printUpload.data as { user_upload_id?: string };
+
+          if (!thumbUploadData.user_upload_id || !printUploadData.user_upload_id) {
+            throw new Error('Upload failed: missing user_upload_id');
+          }
+
+          return {
+            order_item_id: orderItemIds[idx],
+            thumb_user_upload_id: thumbUploadData.user_upload_id,
+            print_user_upload_id: printUploadData.user_upload_id,
+          };
+        })
+      );
+
+      // 4) Link uploaded thumb + print to each order_item
+      const thumbUploadsAndPrintUploadsFiltered = thumbUploadsAndPrintUploads.filter(
+        (v): v is {
+          order_item_id: string;
+          thumb_user_upload_id: string;
+          print_user_upload_id: string;
+        } => v !== null
+      );
+
+      if (thumbUploadsAndPrintUploadsFiltered.length > 0) {
+        await ordersApi.linkOrderItemUploads(orderId, thumbUploadsAndPrintUploadsFiltered);
+      }
+
+      // 5) Submit printful items to Printful (if any)
+      const pfResult = await ordersApi.submitToPrintful(orderId);
+      console.log('Printful submission result:', pfResult.data);
+
+      // 6) Cleanup: delete IndexedDB print assets after successful linking
+      const printKeys = Array.from(
+        new Set(
+          items
+            .map((i) => i.printAssetKey)
+            .filter((k): k is string => typeof k === 'string' && k.length > 0)
+        )
+      );
+
+      if (printKeys.length > 0) {
+        await deleteManyPrintAssets(printKeys);
+      }
+      localStorage.removeItem(PRINT_ASSET_KEYS_LS_KEY);
+
+      clearCart();
+
+      const confirmation = data.confirmation_number || orderId || '';
+      navigate(`/orders?confirmation=${encodeURIComponent(confirmation)}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Checkout failed';
+      setError(message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Button is disabled unless ALL of these are true:
+  // - not already processing
+  // - items in cart
+  // - valid email
+  // - estimate loaded (so we know the shipping cost)
+  // - Stripe Elements rendered
+  // - card form filled out completely
+  const buttonDisabled = processing
+    || items.length === 0
+    || !emailValid
+    || !estimate
+    || !stripeClientSecret
+    || !paymentElementComplete;
 
   return (
     <div className="main-class">
@@ -426,8 +651,27 @@ export default function CheckoutPage() {
                           googlePay: 'auto',
                         },
                         paymentMethodOrder: ['card', 'us_bank_account']
-                        }} />
+                        }} 
+                      onChange={(e) => {
+                        setPaymentElementComplete(e.complete);
+                      }}
+                      />
                     </div>
+
+                    {/* Button moved inside Elements with ElementsConsumer */}
+                    <ElementsConsumer>
+                      {({ stripe, elements }) => (
+                        <div className="">
+                          <button
+                            disabled={buttonDisabled || !stripe || !elements}
+                            onClick={() => handleCompletePurchase(stripe!, elements!)}
+                            className="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {processing ? 'Processing...' : 'Complete Purchase'}
+                          </button>
+                        </div>
+                      )}
+                    </ElementsConsumer>
                   </div>
                 </Elements>
               )}
@@ -453,177 +697,6 @@ export default function CheckoutPage() {
           {estimate && (<>
            <div className="text-bold">Total</div> <div >{currencyFormatter.format(Number(estimate.costs.total))}</div>
             </>)}
-        </div>
-
-        <div className="">
-          <button
-            disabled={processing || items.length === 0 || !emailValid || !estimate}
-            onClick={async () => {
-              setError('');
-              setProcessing(true);
-              try {
-                // 1) Create order + order_items first
-                const response = await ordersApi.create(
-                  orderSummaryLines,
-                  {
-                    billing_address: billingAddress ?? undefined,
-                    shipping_address: shippingAddress ?? undefined,
-                  },
-                  email.trim()
-                );
-                const data = response.data as {
-                  order_id?: string;
-                  order_item_ids?: string[];
-                  confirmation_number?: string;
-                  access_token?: string;
-                  refresh_token?: string;
-                  user?: { id: string; email: string | null };
-                };
-
-                const orderId = data.order_id;
-                const orderItemIds = data.order_item_ids;
-
-                if (!orderId || !orderItemIds || orderItemIds.length !== items.length) {
-                  throw new Error('Checkout failed: missing order ids');
-                }
-
-                // Ensure uploads + linking endpoints can auth immediately.
-                if (data.access_token && data.refresh_token && data.user) {
-                  localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
-                  localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
-
-                  localStorage.setItem(
-                    USER_KEY,
-                    JSON.stringify({ id: data.user.id, email: data.user.email ?? '' })
-                  );
-
-                  setUser({
-                    id: data.user.id,
-                    email: data.user.email ?? '',
-                    admin: false,
-                  });
-                }
-
-                // 2) Upload thumb + printfile for each cart line
-                const thumbUploadsAndPrintUploads = await Promise.all(
-                  items.map(async (cartLine, idx) => {
-                    // If there is no print asset key, we do NOTHING for this cart line
-                    // (no thumb upload, no print upload, no linking for it).
-                    const printAssetKey = cartLine.printAssetKey;
-                    if (!printAssetKey) {
-                      return null;
-                    }
-
-                    const thumbDataUrl = cartLine.image;
-                    if (!thumbDataUrl) {
-                      throw new Error(`Missing thumb for cart item ${idx + 1}`);
-                    }
-
-                    // "Optimal size": resize only when the thumb is a data URL.
-                    // The fallback thumb (remote URL) can fail due to CORS, so we upload it as-is.
-                    let thumbFile: File;
-
-                    if (thumbDataUrl.startsWith('data:')) {
-                      const thumbBlobResized = await dataUrlToResizedBlob(
-                        thumbDataUrl,
-                        512,
-                        'image/jpeg',
-                        0.85
-                      );
-                      thumbFile = new File(
-                        [thumbBlobResized],
-                        `thumb-${orderItemIds[idx]}.jpg`,
-                        { type: 'image/jpeg' }
-                      );
-                    } else {
-                      // Remote fallback thumb URLs can trigger CORS failures when fetched in-browser.
-                      // Proxy through our worker so the browser sees same-origin responses.
-                      const proxiedUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(thumbDataUrl)}`;
-                      const thumbResp = await fetch(proxiedUrl);
-                      const thumbBlob = await thumbResp.blob();
-                      thumbFile = new File(
-                        [thumbBlob],
-                        `thumb-${orderItemIds[idx]}`,
-                        { type: thumbBlob.type || 'application/octet-stream' }
-                      );
-                    }
-
-                    const printBlob = await getPrintFileBlob(printAssetKey);
-                    if (!printBlob) {
-                      throw new Error(`Printfile missing from IndexedDB for cart item ${idx + 1}`);
-                    }
-
-                    // Name/extension for print file: keep as-is (type may vary).
-                    const printFile = new File([printBlob], `print-${orderItemIds[idx]}`, {
-                      type: printBlob.type || 'application/octet-stream',
-                    });
-
-                    const [thumbUpload, printUpload] = await Promise.all([
-                      uploadsApi.create(thumbFile, 'thumb'),
-                      uploadsApi.create(printFile, 'print'),
-                    ]);
-
-                    const thumbUploadData = thumbUpload.data as { user_upload_id?: string };
-                    const printUploadData = printUpload.data as { user_upload_id?: string };
-
-                    if (!thumbUploadData.user_upload_id || !printUploadData.user_upload_id) {
-                      throw new Error('Upload failed: missing user_upload_id');
-                    }
-
-                    return {
-                      order_item_id: orderItemIds[idx],
-                      thumb_user_upload_id: thumbUploadData.user_upload_id,
-                      print_user_upload_id: printUploadData.user_upload_id,
-                    };
-                  })
-                );
-
-                // 3) Link uploaded thumb + print to each order_item
-                const thumbUploadsAndPrintUploadsFiltered = thumbUploadsAndPrintUploads.filter(
-                  (v): v is {
-                    order_item_id: string;
-                    thumb_user_upload_id: string;
-                    print_user_upload_id: string;
-                  } => v !== null
-                );
-
-                if (thumbUploadsAndPrintUploadsFiltered.length > 0) {
-                  await ordersApi.linkOrderItemUploads(orderId, thumbUploadsAndPrintUploadsFiltered);
-                }
-
-                // 4) Submit printful items to Printful (if any)
-                const pfResult = await ordersApi.submitToPrintful(orderId);
-                console.log('Printful submission result:', pfResult.data);
-
-                // 5) Cleanup: delete IndexedDB print assets after successful linking
-                const printKeys = Array.from(
-                  new Set(
-                    items
-                      .map((i) => i.printAssetKey)
-                      .filter((k): k is string => typeof k === 'string' && k.length > 0)
-                  )
-                );
-
-                if (printKeys.length > 0) {
-                  await deleteManyPrintAssets(printKeys);
-                }
-                localStorage.removeItem(PRINT_ASSET_KEYS_LS_KEY);
-
-                clearCart();
-
-                const confirmation = data.confirmation_number || orderId || '';
-                navigate(`/orders?confirmation=${encodeURIComponent(confirmation)}`);
-              } catch (e: unknown) {
-                const message = e instanceof Error ? e.message : 'Checkout failed';
-                setError(message);
-              } finally {
-                setProcessing(false);
-              }
-            }}
-            className=" w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {processing ? 'Processing...' : 'Complete Purchase'}
-          </button>
         </div>
 
       </div>
