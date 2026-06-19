@@ -244,8 +244,11 @@ export default function CheckoutPage() {
   // after the estimate is loaded and button is clicked.
   const chargeAmountCents = useMemo(() => {
     if (estimate?.costs?.total) {
-      return dollarsToCents(estimate.costs.total);
+      const cents = dollarsToCents(estimate.costs.total);
+      console.log('chargeAmountCents updated to:', cents, 'from estimate total:', estimate.costs.total);
+      return cents;
     }
+    console.log('chargeAmountCents: using bootstrap 100 cents (no estimate yet)');
     return 100; // $1.00 bootstrap so Elements render before estimate arrives
   }, [estimate]);
 
@@ -256,6 +259,7 @@ export default function CheckoutPage() {
   const [stripeClientSecret, setStripeClientSecret] = useState<string>('');
   const [stripeUiError, setStripeUiError] = useState<string>('');
   const [stripeUiLoading, setStripeUiLoading] = useState(false);
+  const [stripeClientSecretUpdating, setStripeClientSecretUpdating] = useState(false);
 
   // Re-fetch client secret when the charge amount changes (e.g. when estimate arrives).
   // Stripe's <Elements> component handles clientSecret updates gracefully - it updates the
@@ -278,6 +282,7 @@ export default function CheckoutPage() {
       // the loading overlay since Elements is already rendered.
       const isFirstLoad = !stripeClientSecret;
       if (isFirstLoad) setStripeUiLoading(true);
+      if (!isFirstLoad) setStripeClientSecretUpdating(true);
 
       try {
         const clientSecret = await createPaymentIntentUiClientSecret({
@@ -286,10 +291,18 @@ export default function CheckoutPage() {
           receiptEmail: email.trim(),
         });
 
-        if (!cancelled) setStripeClientSecret(clientSecret);
+        console.log('Created PaymentIntent with amount:', amount, 'cents ($' + (amount / 100).toFixed(2) + ')');
+
+        if (!cancelled) {
+          setStripeClientSecret(clientSecret);
+          setStripeClientSecretUpdating(false);
+        }
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Failed to load Stripe UI';
-        if (!cancelled) setStripeUiError(message);
+        if (!cancelled) {
+          setStripeUiError(message);
+          setStripeClientSecretUpdating(false);
+        }
       } finally {
         if (!cancelled && isFirstLoad) setStripeUiLoading(false);
       }
@@ -303,6 +316,7 @@ export default function CheckoutPage() {
   }, [stripePublishableKey, emailValid, items.length, chargeAmountCents, currency, email]);
 
   const onGetEstimate = (estimate: PrintfulEstimateResponse) => {
+    console.log('Estimate received:', estimate.costs.total, 'total');
     setEstimate(estimate);
     return null;
   }
@@ -315,6 +329,21 @@ export default function CheckoutPage() {
     setProcessing(true);
 
     try {
+      // SAFETY CHECK: Verify the amount matches the current estimate before charging.
+      // This ensures we never charge a different amount than what was quoted.
+      if (!estimate?.costs?.total) {
+        throw new Error('Estimate is missing. Cannot complete purchase.');
+      }
+
+      const estimatedAmountCents = dollarsToCents(estimate.costs.total);
+      console.log('Purchase verification - chargeAmountCents:', chargeAmountCents, 'estimatedAmountCents:', estimatedAmountCents, 'estimate.costs.total:', estimate.costs.total);
+      
+      if (chargeAmountCents !== estimatedAmountCents) {
+        throw new Error(
+          `Amount mismatch: form shows $${(chargeAmountCents / 100).toFixed(2)} but estimate is $${(estimatedAmountCents / 100).toFixed(2)}. Please refresh and try again.`
+        );
+      }
+
       // Step 1: Confirm the Stripe payment
       const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
@@ -494,12 +523,16 @@ export default function CheckoutPage() {
   // - items in cart
   // - valid email
   // - estimate loaded (so we know the shipping cost)
+  // - charge amount is ABOVE bootstrap ($1.00) — ensures new PaymentIntent was created
+  // - Stripe client secret is not currently being updated (race condition prevention)
   // - Stripe Elements rendered
   // - card form filled out completely
   const buttonDisabled = processing
     || items.length === 0
     || !emailValid
     || !estimate
+    || chargeAmountCents <= 100 // Must be above bootstrap amount ($1.00)
+    || stripeClientSecretUpdating // Ensure PaymentIntent amount update is complete
     || !stripeClientSecret
     || !paymentElementComplete;
 
@@ -641,22 +674,30 @@ export default function CheckoutPage() {
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="text-sm font-semibold">Payment info</div>
-                      <PaymentElement 
-                      options={{ 
-                        layout: 'tabs', 
-                        wallets: {
-                          link: 'never', 
-                          googlePay: 'auto',
-                        },
-                        paymentMethodOrder: ['card', 'us_bank_account']
-                        }} 
-                      onChange={(e) => {
-                        setPaymentElementComplete(e.complete);
-                      }}
-                      />
-                    </div>
+                    {chargeAmountCents > 100 && (
+                      <div className="space-y-2">
+                        <div className="text-sm font-semibold">Payment info</div>
+                        <PaymentElement 
+                        options={{ 
+                          layout: 'tabs', 
+                          wallets: {
+                            link: 'never', 
+                            googlePay: 'auto',
+                          },
+                          paymentMethodOrder: ['card', 'us_bank_account']
+                          }} 
+                        onChange={(e) => {
+                          setPaymentElementComplete(e.complete);
+                        }}
+                        />
+                      </div>
+                    )}
+
+                    {chargeAmountCents <= 100 && shippingAddress && (
+                      <div className="rounded-md border border-dashed border-gray-300 p-4">
+                        <div className="text-sm text-gray-600">Calculating shipping estimate...</div>
+                      </div>
+                    )}
 
                     {/* Button moved inside Elements with ElementsConsumer */}
                     <ElementsConsumer>
