@@ -566,6 +566,7 @@ orders.post('/printful-estimate', async (c) => {
         quantity: number;
         retail_price?: string;
         name?: string;
+        options: {id: string, value: any}[];
       }>;
       retail_costs?: {
         currency?: string;

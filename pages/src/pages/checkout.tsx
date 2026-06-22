@@ -239,7 +239,7 @@ export default function CheckoutPage() {
         }
         ],
         orientation: item.template?.orientation,
-        product_options: [], // todo: use options
+        product_options: item.options ?? [], // todo: use options
       }), // Include extra meta for display in order summary
     })) satisfies CartLine[];
   }, [items]);
@@ -255,6 +255,7 @@ export default function CheckoutPage() {
         name: item.name,
         technique: item.technique?.key,
         template: item.template,
+        options: item.options ?? []
       }));
   }, [items]);
 

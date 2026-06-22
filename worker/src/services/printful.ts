@@ -789,6 +789,7 @@ export type PrintfulEstimateOrderItem = {
   name?: string;
   placements?: PrintfulOrderItemPlacement[];
   orientation?: string;
+  product_options?: {name: string, value: any}[];
 };
 
 export type PrintfulEstimateRequestBody = {
@@ -981,7 +982,7 @@ export async function createAndPollPrintfulEstimate(
  */
 export async function enrichEstimateOrderItemsWithPlacements(
   env: PrintfulEnv,
-  orderItems: Array<{ catalog_variant_id: number; external_id: string; quantity: number; retail_price?: string; name?: string, technique?: string, template?: any }>
+  orderItems: Array<{ catalog_variant_id: number; external_id: string; quantity: number; retail_price?: string; name?: string, technique?: string, template?: any, options: {id: string, value: any}[] }>
 ): Promise<PrintfulEstimateOrderItem[]> {
   const enriched: PrintfulEstimateOrderItem[] = [];
 
@@ -1032,6 +1033,7 @@ export async function enrichEstimateOrderItemsWithPlacements(
           ],
         },
       ],
+      product_options: item.options?.map(option => ({ name: option.id, value: option.value })) || []
     });
   }
 
@@ -1171,6 +1173,7 @@ export type PrintfulOrderItem = {
   placements?: PrintfulOrderItemPlacement[];
   product_template_id?: number;
   files?: PrintfulOrderFile[];
+  options?: Array<{ id: string; value: boolean | string | number }>;
   orientation?: string;
   product_options?: Array<{ name: string; value: boolean | string | number }>;
 };
@@ -1481,6 +1484,7 @@ export async function submitPrintfulOrder(
           // }
         }
       ],
+      options: meta.options ?? [],
       // v2 broken for horizontal orientation
       // placements: meta.orientation != 'horizontal' && [
       //   {
@@ -1521,8 +1525,7 @@ export async function submitPrintfulOrder(
   };
 
   console.log(`Submitting Printful order ${JSON.stringify(payload, null, 2)}...`);
-  // Call Printful v2 API
-  // const apiUrl = JSON.parse(dbOrderItems[0]?.meta ?? '{}').orientation == 'horizontal' ? 'https://api.printful.com/orders' : 'https://api.printful.com/v2/orders';
+  // Call Printful API
   const apiUrl = true ? 'https://api.printful.com/orders' : 'https://api.printful.com/v2/orders';
   const response = await fetch(apiUrl, {
     method: 'POST',

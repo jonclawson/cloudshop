@@ -355,6 +355,7 @@ export const ordersApi = {
       // custom
       technique?: string;
       template?: any;
+      options?: {id: string, value: any}[];
     }>;
     retail_costs?: {
       currency?: string;

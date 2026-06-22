@@ -10,6 +10,7 @@ type PrintfulEstimateProps = {
     name?: string;
     technique?: string;
     template?: any;
+    options?: {id: string, value: any}[];
   }>;
   retailCosts?: {
     currency?: string;

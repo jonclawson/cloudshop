@@ -74,7 +74,7 @@ export default function ProductPage() {
   const [thumbFile, setThumbFile] = useState<File | null>(null);
   const [thumbFileUrl, setThumbFileUrl] = useState<string | null>(null);
 
-  const [options, setOptions] = useState<{[key: string]: any}>({});
+  const [options, setOptions] = useState<{id: string, value: any}[]>([]);
   const [technique, setTechnique] = useState<{key: string, display_name: string, is_default: boolean} | null>(null);
 
   useEffect(() => {
@@ -127,10 +127,9 @@ export default function ProductPage() {
             nextProduct.options.forEach((option) => {
               if (option.values) {
                 const firstValue = Object.entries(option.values)[0];
-                setOptions((prev) => ({
-                  ...prev,
-                  [option.id]: {option, value: firstValue},
-                }));
+                setOptions((prev) => ([
+                  {id: option.id, value: firstValue[0]},
+                ]));
               }
             });
           }
@@ -312,11 +311,10 @@ export default function ProductPage() {
   };
 
   const handleOptionChange = (optionId: string, value: any) => {
-    const option = product?.options?.find((o) => o.id === optionId);
-    setOptions((prev) => ({
-      ...prev,
-      [optionId]: {option, value: JSON.parse(value)},
-    }));
+
+    setOptions((prev) => ([
+      ...prev.map((o) => o.id === optionId ? { ...o, value: value } : o)
+    ]));
   }
 
   const handleTechniqueChange = (techniqueKey: string) => {
@@ -411,7 +409,7 @@ export default function ProductPage() {
               </div>
             )}
 
-            {(technique?.key === 'embroidery' || technique?.key === 'cut-sew') && product.options && product.options.length > 0 && (
+            {(technique?.key === 'embroidery' || technique?.key.toLowerCase() === 'cut-sew') && product.options && product.options.length > 0 && (
               <div className="mb-3">
                 {product?.options.map((option) => (
                   <div key={option.id} className="mb-3">
@@ -423,7 +421,7 @@ export default function ProductPage() {
                       onChange={(e) => handleOptionChange(option.id, e.target.value)}
                       >
                       {option.values && Object.entries(option.values).map(([key, value]: [string, any]) => (
-                        <option key={key} value={JSON.stringify({[key]: value})}>
+                        <option key={key} value={key}>
                           {value} {option.additional_price ? `(+${option.additional_price})` : ''}
                         </option>
                       ))}
@@ -486,6 +484,7 @@ export default function ProductPage() {
                     name: displayName,
                     technique: technique?.key,
                     template: printStudioConfig,
+                    options: options,
                   },
                 ]}
                 retailCosts={{
