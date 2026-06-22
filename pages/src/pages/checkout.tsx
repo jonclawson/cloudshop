@@ -176,8 +176,47 @@ export default function CheckoutPage() {
       price: item.price,
       currency: item.currency,
       meta: JSON.stringify({ 
-        technique: item.technique, 
+        // v1 options
+        // "id": 1,
+        // "external_id": "item-1",
+        // "variant_id": 1,
+        // "sync_variant_id": 1,
+        // "external_variant_id": "variant-1",
+        // "warehouse_product_variant_id": 1,
+        "product_template_id": item?.template?.template_id,
+        // "external_product_id": "template-123",
+        // "quantity": 1,
+        // "price": "13.00",
+        // "retail_price": "13.00",
+        // "name": "Enhanced Matte Paper Poster 18×24",
+        // "product": {
+        //   "variant_id": 3001,
+        //   "product_id": 301,
+        //   "image": "https://files.cdn.printful.com/products/71/5309_1581412541.jpg",
+        //   "name": "Bella + Canvas 3001 Unisex Short Sleeve Jersey T-Shirt with Tear Away Label (White / 4XL)"
+        // },
+        files: [
+          {
+            "type": item?.template?.placement,
+            "url": "​",
+            "options": [ ],
+            "filename": "",
+            "visible": true,
+            "position": {
+              "area_width": item?.template?.printfile_width && (item?.template?.printfile_width ) || 0,
+              "area_height": item?.template?.printfile_height && (item?.template?.printfile_height ) || 0,
+              "width": item?.template?.printfile_width && (item?.template?.printfile_width ) || 0,
+              "height": item?.template?.printfile_height && (item?.template?.printfile_height ) || 0,
+              "top": 0,
+              "left": 0,
+              "limit_to_print_area": true
+            }
+          }
+        ],
         options: item.options,
+        // v2
+        technique: item.technique, 
+        // options: item.options,
         placements: [
         {
           placement: item?.template?.placement || 'front',
@@ -215,6 +254,7 @@ export default function CheckoutPage() {
         retail_price: (item.price / 100).toFixed(2),
         name: item.name,
         technique: item.technique?.key,
+        template: item.template,
       }));
   }, [items]);
 

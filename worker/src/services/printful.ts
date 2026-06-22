@@ -509,6 +509,7 @@ export async function getPrintfulProductById(c: { env: PrintfulEnv }, id: string
 }
 
 export type PrintstudioTemplateConfig = {
+  template_id?: number;
   placement: string;
   template_width: number;
   template_height: number;
@@ -528,6 +529,7 @@ export type PrintstudioTemplateConfig = {
   printfile_width: number;
   printfile_height: number;
   printfile_dpi: number;
+  fill_mode?: string;
 };
 
 type PrintfulMockupTemplate = {
@@ -607,6 +609,7 @@ function mapToPrintstudioTemplateConfig(template: PrintfulMockupTemplate, printf
   }
 
   return {
+    template_id: template.template_id,
     placement: template.placement,
     template_width: template.template_width,
     template_height: template.template_height,
@@ -624,6 +627,7 @@ function mapToPrintstudioTemplateConfig(template: PrintfulMockupTemplate, printf
     printfile_width: matchedPrintfile.width,
     printfile_height: matchedPrintfile.height,
     printfile_dpi: matchedPrintfile.dpi,
+    fill_mode: matchedPrintfile.fill_mode,
   };
 }
 
@@ -689,12 +693,14 @@ export async function getPrintfulMockupTemplates(c: { env: PrintfulEnv }, catalo
 
 export async function getPrintfulMockupGeneratorPrintfiles(
   c: { env: PrintfulEnv },
-  catalogProductId: string
+  catalogProductId: string,
+  opts?: { variantId?: string, technique?: string }
 ): Promise<PrintfulPrintfile[]> {
   const apiKey = c.env.PRINTFUL_API_KEY;
   if (!apiKey) throw new Error('MISSING_PRINTFUL_API_KEY');
 
   const url = new URL(`https://api.printful.com/mockup-generator/printfiles/${encodeURIComponent(catalogProductId)}`);
+  if (opts?.technique) url.searchParams.set('technique', opts.technique);
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -731,7 +737,7 @@ export async function getPrintstudioTemplateConfig(
 ): Promise<PrintstudioTemplateConfig> {
   const [templates, printfiles] = await Promise.all([
     getPrintfulMockupTemplates(c, catalogProductId, opts),
-    getPrintfulMockupGeneratorPrintfiles(c, catalogProductId),
+    getPrintfulMockupGeneratorPrintfiles(c, catalogProductId, opts),
   ]);
 
   const template = pickPrintfulMockupTemplate(templates, opts);
@@ -975,7 +981,7 @@ export async function createAndPollPrintfulEstimate(
  */
 export async function enrichEstimateOrderItemsWithPlacements(
   env: PrintfulEnv,
-  orderItems: Array<{ catalog_variant_id: number; external_id: string; quantity: number; retail_price?: string; name?: string, technique?: string }>
+  orderItems: Array<{ catalog_variant_id: number; external_id: string; quantity: number; retail_price?: string; name?: string, technique?: string, template?: any }>
 ): Promise<PrintfulEstimateOrderItem[]> {
   const enriched: PrintfulEstimateOrderItem[] = [];
 
@@ -991,32 +997,11 @@ export async function enrichEstimateOrderItemsWithPlacements(
     const catalogProductId = await getCatalogProductIdForVariant({ env }, variantId);
 
     // Default placement values
-    let placement: string = 'front';
+    let placement: string = item.template?.placement || 'front';
     let technique: string = item.technique || 'dtfilm';
-    let width: number = 10;
-    let height: number = 10;
+    let width: number =  (item.template?.printfile_width / item.template?.printfile_dpi) || 10;
+    let height: number =  (item.template?.printfile_height / item.template?.printfile_dpi) || 10;
 
-    if (catalogProductId) {
-      const catalogProduct = await fetchCatalogProduct({ env }, catalogProductId);
-
-      if (catalogProduct?.placements) {
-        const frontPlacement = catalogProduct.placements.find((p) => p.placement === 'front')
-          ?? catalogProduct.placements[0];
-
-        if (frontPlacement) {
-          placement = frontPlacement.placement;
-          technique = technique || frontPlacement.technique;
-
-          const dimensions = await fetchCatalogVariantPlacementDimensions({ env }, catalogProductId, catalogVariantId);
-          const frontDim = dimensions.find((d) => d.placement === frontPlacement.placement);
-
-          if (frontDim) {
-            width = frontDim.width;
-            height = frontDim.height;
-          }
-        }
-      }
-    }
 
     // Build placeholder URL using placement dimensions
     const placeholderUrl = `https://placehold.co/${width}x${height}.png`;
@@ -1158,14 +1143,34 @@ export type PrintfulOrderItemPlacement = {
   placement_options?: Array<{ name: string; value: boolean | string | number }>;
 };
 
+export type PrintfulOrderFile = {
+  type: 'default';
+  url: string;
+  options?: Array<{ name: string; value: boolean | string | number }>;
+  filename?: string;
+  visible: boolean;
+  position?: {
+    area_width: number;
+    area_height: number;
+    width: number;
+    height: number;
+    top: number;
+    left: number;
+    limit_to_print_area: boolean;
+  };
+};
+
 export type PrintfulOrderItem = {
   source: 'catalog';
-  catalog_variant_id: number;
+  catalog_variant_id?: number;
+  variant_id: number;
   external_id: string;
   quantity: number;
   retail_price?: string;
   name?: string;
   placements?: PrintfulOrderItemPlacement[];
+  product_template_id?: number;
+  files?: PrintfulOrderFile[];
   orientation?: string;
   product_options?: Array<{ name: string; value: boolean | string | number }>;
 };
@@ -1450,29 +1455,52 @@ export async function submitPrintfulOrder(
     
     items.push({
       source: 'catalog',
-      catalog_variant_id: catalogVariantId,
+      catalog_variant_id: catalogVariantId, // v2
+      variant_id: catalogVariantId, // v1
       external_id: String(orderItem.id),
       quantity: orderItem.quantity,
       retail_price: orderItem.price_at_purchase.toFixed(2),
-      placements: [
+      // product_template_id: meta?.product_template_id,
+      // v1
+      files: [ 
         {
-          placement: meta.placements[0].placement,
-          technique: meta.placements[0].technique,
-          print_area_type: 'simple',
-          layers: [
-            {
-              type: 'file',
-              url: signedUrl,
-              position: {
-                width: meta.placements[0].layers[0].position.width,
-                height: meta.placements[0].layers[0].position.height,
-                top: 0,
-                left: 0,
-              },
-            },
-          ],
-        },
+          type: meta.files?.[0]?.type,
+          url: signedUrl,
+          options: [],
+          // filename: printFile.filename,
+          visible: true,
+          // centers if not specified.
+          // position: {
+          //   area_width: meta.files?.[0]?.position?.area_width || 0,
+          //   area_height: meta.files?.[0]?.position?.area_height || 0,
+          //   width: meta.files?.[0]?.position?.width || 0,
+          //   height: meta.files?.[0]?.position?.height || 0,
+          //   top: 0,
+          //   left: 0,
+          //   limit_to_print_area: true
+          // }
+        }
       ],
+      // v2 broken for horizontal orientation
+      // placements: meta.orientation != 'horizontal' && [
+      //   {
+      //     placement: meta.placements[0].placement,
+      //     technique: meta.placements[0].technique,
+      //     print_area_type: 'simple',
+      //     layers: [
+      //       {
+      //         type: 'file',
+      //         url: signedUrl,
+      //         position: {
+      //           width: meta.placements[0].layers[0].position.width,
+      //           height: meta.placements[0].layers[0].position.height,
+      //           top: 0,
+      //           left: 0,
+      //         },
+      //       },
+      //     ],
+      //   },
+      // ],
       orientation: meta.orientation,
     });
   }
@@ -1494,7 +1522,9 @@ export async function submitPrintfulOrder(
 
   console.log(`Submitting Printful order ${JSON.stringify(payload, null, 2)}...`);
   // Call Printful v2 API
-  const response = await fetch('https://api.printful.com/v2/orders', {
+  // const apiUrl = JSON.parse(dbOrderItems[0]?.meta ?? '{}').orientation == 'horizontal' ? 'https://api.printful.com/orders' : 'https://api.printful.com/v2/orders';
+  const apiUrl = true ? 'https://api.printful.com/orders' : 'https://api.printful.com/v2/orders';
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -1506,6 +1536,7 @@ export async function submitPrintfulOrder(
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
+    console.log(`PRINTFUL_ORDER_ERROR: ${response.status}:${errorText}`);
     throw new Error(`PRINTFUL_ORDER_FAILED:${response.status}:${errorText.slice(0, 500)}`);
   }
 

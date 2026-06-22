@@ -257,6 +257,7 @@ export const authApi = {
 };
 
 export type PrintstudioTemplateConfig = {
+  template_id?: number;
   placement: string;
   template_width: number;
   template_height: number;
@@ -351,6 +352,9 @@ export const ordersApi = {
       quantity: number;
       retail_price?: string;
       name?: string;
+      // custom
+      technique?: string;
+      template?: any;
     }>;
     retail_costs?: {
       currency?: string;

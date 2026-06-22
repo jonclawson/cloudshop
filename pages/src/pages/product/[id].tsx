@@ -484,7 +484,8 @@ export default function ProductPage() {
                     quantity: 1,
                     retail_price: selectedVariant.price.toFixed(2),
                     name: displayName,
-                    technique: technique?.key
+                    technique: technique?.key,
+                    template: printStudioConfig,
                   },
                 ]}
                 retailCosts={{
