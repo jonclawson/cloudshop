@@ -15,7 +15,7 @@
     "@shadcn/ui": "latest",
     "@stripe/react-stripe-js": "latest",
     "@stripe/stripe-js": "latest",
-    "printstudio": "^0.1.7",
+    "printstudio": "^0.1.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
