@@ -98,6 +98,12 @@ jobs:
           echo ""
           echo "Wrangler logs (last 30 lines):"
           docker logs cloudshop-wrangler-1 2>&1 | tail -30
+          echo ""
+          echo "Checking if wrangler process is still running:"
+          docker exec cloudshop-wrangler-1 ps aux | grep wrangler || echo "No wrangler process found"
+          echo ""
+          echo "Full container output (stderr):"
+          docker logs cloudshop-wrangler-1 --stderr 2>&1 | tail -20
           exit 1
 
       - name: Run Playwright tests
