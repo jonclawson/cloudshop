@@ -38,7 +38,7 @@ jobs:
 
       - name: Install Playwright
         run: |
-          npm ci
+          npm i
           npx playwright install --with-deps
 
       - name: Create environment files
