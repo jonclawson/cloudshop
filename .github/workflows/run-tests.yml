@@ -64,7 +64,7 @@ jobs:
       - name: Wait for services to be ready
         run: |
           echo "Waiting for services to be ready (max 3 minutes)..."
-          for i in {1..30}; do
+          for i in {1..90}; do
             worker_ready=$(curl -s http://localhost:8787/health > /dev/null 2>&1 && echo "✓" || echo "✗")
             pages_ready=$(curl -s http://localhost:5173 > /dev/null 2>&1 && echo "✓" || echo "✗")
             echo "[$i/90] Worker: $worker_ready | Pages: $pages_ready"
