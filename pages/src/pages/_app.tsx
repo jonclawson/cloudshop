@@ -54,7 +54,8 @@ export default function GlobalLayout() {
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold text-gray-900">
-              <Link to="/" className="text-indigo-600 hover:text-indigo-700">
+              <Link to="/" className="text-cyan-600 hover:text-indigo-700">
+                <img src="./cloud-logo.png" alt="Cloudshop" className="inline-block h-8 mr-2" />
                 Cloudshop
               </Link>
             </h1>
