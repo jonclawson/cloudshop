@@ -8,11 +8,11 @@ terraform {
   }
 
   cloud {
-    organization = var.tf_cloud_organization
+    # organization = var.tf_cloud_organization
 
-    workspaces {
-      name = var.tf_cloud_workspace
-    }
+    # workspaces {
+    #   name = var.tf_cloud_workspace
+    # }
   }
 }
 
