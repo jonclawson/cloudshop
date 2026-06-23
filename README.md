@@ -232,6 +232,22 @@ To use real APIs:
 
 ## Deployment
 
+### Fork & Deploy to Your Own Infrastructure
+
+This app is designed to be forked and deployed by anyone to their own Cloudflare account. No hardcoded account data is stored in the code.
+
+**One-time setup:**
+1. Fork this repository
+2. Create a Terraform Cloud account at terraform.io (free tier)
+3. Get your values:
+   - **Terraform Cloud:** Organization name, API token
+   - **Cloudflare:** Account ID, API token
+   - **Stripe, Printful, Mailchannels:** API keys for your accounts
+4. Add all values to GitHub Secrets (see table below)
+5. Push to main — GitHub Actions will deploy automatically
+
+**All values are organization-specific and must be set via GitHub Secrets — nothing is hardcoded in the repository.**
+
 ### Prerequisites
 
 1. **Terraform Cloud Account**
@@ -254,8 +270,7 @@ Add these secrets to your GitHub repository settings. They are used by GitHub Ac
 
 | Secret | Purpose | Source | Required For |
 |--------|---------|--------|--------------|
-| `TF_API_TOKEN` | Terraform Cloud authentication | terraform.io | Infrastructure deployment |
-| `CF_API_TOKEN` | Cloudflare API authentication | Cloudflare Dashboard → API Tokens | All Cloudflare operations |
+| `TF_API_TOKEN` | Terraform Cloud authentication | terraform.io | Infrastructure deployment || `TF_CLOUD_ORGANIZATION` | Terraform Cloud organization name | terraform.io → Settings → Organization Name | Infrastructure deployment || `CF_API_TOKEN` | Cloudflare API authentication | Cloudflare Dashboard → API Tokens | All Cloudflare operations |
 | `CF_ACCOUNT_ID` | Cloudflare account identifier | Cloudflare Dashboard → Account ID | All Cloudflare operations |
 | `JWT_SECRET` | JWT token signing secret (Worker) | Generate any strong random string | Worker authentication |
 | `STRIPE_SECRET_KEY` | Stripe API secret key | Stripe Dashboard → API Keys | Payment processing |

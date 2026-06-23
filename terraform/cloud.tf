@@ -8,7 +8,7 @@ terraform {
   }
 
   cloud {
-    organization = "YOUR_ORG"
+    organization = var.tf_cloud_organization
 
     workspaces {
       name = "cloudshop"
@@ -18,6 +18,12 @@ terraform {
 
 provider "cloudflare" {
   api_token = var.cloudflare_api_token
+}
+
+variable "tf_cloud_organization" {
+  description = "Terraform Cloud organization name"
+  type        = string
+  sensitive   = true
 }
 
 variable "cloudflare_api_token" {
