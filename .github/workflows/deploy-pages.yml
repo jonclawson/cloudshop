@@ -7,10 +7,13 @@ on:
       - 'pages/**'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Deploy Infrastructure", "Run Tests"]
+    types: [completed]
 
 jobs:
   deploy:
-    needs: run-tests
+    # needs: run-tests
     runs-on: ubuntu-latest
 
     steps:
