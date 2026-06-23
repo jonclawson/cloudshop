@@ -270,8 +270,8 @@ Add these secrets to your GitHub repository settings. They are used by GitHub Ac
 
 | Secret | Purpose | Source | Required For |
 |--------|---------|--------|--------------|
-| `TF_API_TOKEN` | Terraform Cloud authentication | terraform.io | Infrastructure deployment |
-| `TF_CLOUD_ORGANIZATION` | Terraform Cloud organization name | terraform.io → Settings → Organization Name | Infrastructure deployment |
+| `TF_API_TOKEN` | Terraform Cloud authentication |  app.terraform.io | Infrastructure deployment |
+| `TF_CLOUD_ORGANIZATION` | Terraform Cloud organization name |  app.terraform.io → Settings → Organization Name | Infrastructure deployment |
 | `TF_CLOUD_WORKSPACE` | Terraform Cloud workspace name | Any name (e.g., "cloudshop") | Infrastructure deployment |
 | `CF_API_TOKEN` | Cloudflare API authentication | Cloudflare Dashboard → API Tokens | All Cloudflare operations |
 | `CF_ACCOUNT_ID` | Cloudflare account identifier | Cloudflare Dashboard → Account ID | All Cloudflare operations |
