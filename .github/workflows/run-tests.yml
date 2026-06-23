@@ -64,7 +64,7 @@ jobs:
       - name: Wait for services to be ready
         run: |
           echo "Waiting for services to be ready (max 3 minutes)..."
-          for i in {1..90}; do
+          for i in {1..30}; do
             worker_ready=$(curl -s http://localhost:8787/health > /dev/null 2>&1 && echo "✓" || echo "✗")
             pages_ready=$(curl -s http://localhost:5173 > /dev/null 2>&1 && echo "✓" || echo "✗")
             echo "[$i/30] Worker: $worker_ready | Pages: $pages_ready"
@@ -80,7 +80,7 @@ jobs:
           echo "❌ Services did not start in time after 3 minutes"
           echo "Debug info:"
           docker ps
-          docker logs cloudshop-wrangler-1 2>&1 | tail -30
+          docker logs cloudshop-wrangler-1 2>&1 | tail -20
           docker logs cloudshop-pages-1 2>&1 | tail -20
           exit 1
 
