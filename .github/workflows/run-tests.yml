@@ -62,15 +62,23 @@ jobs:
 
       - name: Wait for services to be ready
         run: |
-          for i in {1..30}; do
-            if curl -s http://localhost:8787/health && curl -s http://localhost:5173 > /dev/null 2>&1; then
-              echo "Services are ready"
+          echo "Waiting for services to be ready (max 3 minutes)..."
+          for i in {1..90}; do
+            worker_ready=$(curl -s http://localhost:8787/health > /dev/null 2>&1 && echo "✓" || echo "✗")
+            pages_ready=$(curl -s http://localhost:5173 > /dev/null 2>&1 && echo "✓" || echo "✗")
+            echo "[$i/90] Worker: $worker_ready | Pages: $pages_ready"
+            
+            if [ "$worker_ready" = "✓" ] && [ "$pages_ready" = "✓" ]; then
+              echo "✅ Services are ready!"
               exit 0
             fi
-            echo "Waiting for services... ($i/30)"
             sleep 2
           done
-          echo "Services did not start in time"
+          echo "❌ Services did not start in time after 3 minutes"
+          echo "Debug info:"
+          docker ps
+          docker logs cloudflare_app-wrangler-1 2>&1 | tail -20
+          docker logs cloudflare_app-pages-1 2>&1 | tail -20
           exit 1
 
       - name: Run Playwright tests
