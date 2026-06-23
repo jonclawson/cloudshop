@@ -243,11 +243,31 @@ To use real APIs:
    - Generate API token with Workers, Pages, D1, R2, KV permissions
    - Add to GitHub Secrets: `CF_API_TOKEN`, `CF_ACCOUNT_ID`
 
-3. **Third-party APIs** (add to GitHub Secrets)
-   - `STRIPE_SECRET_KEY`
-   - `STRIPE_PUBLISHABLE_KEY`
-   - `PRINTFUL_API_KEY`
-   - `MAILCHANNELS_API_KEY`
+3. **Third-party APIs**
+   - Stripe account (get API keys)
+   - Printful account (get API key)
+   - Mailchannels account (get API key)
+
+### GitHub Secrets Required
+
+Add these secrets to your GitHub repository settings. They are used by GitHub Actions workflows for automated deployment.
+
+| Secret | Purpose | Source | Required For |
+|--------|---------|--------|--------------|
+| `TF_API_TOKEN` | Terraform Cloud authentication | terraform.io | Infrastructure deployment |
+| `CF_API_TOKEN` | Cloudflare API authentication | Cloudflare Dashboard → API Tokens | All Cloudflare operations |
+| `CF_ACCOUNT_ID` | Cloudflare account identifier | Cloudflare Dashboard → Account ID | All Cloudflare operations |
+| `JWT_SECRET` | JWT token signing secret (Worker) | Generate any strong random string | Worker authentication |
+| `STRIPE_SECRET_KEY` | Stripe API secret key | Stripe Dashboard → API Keys | Payment processing |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe public key | Stripe Dashboard → API Keys | Frontend payment integration |
+| `PRINTFUL_API_KEY` | Printful API authentication | Printful Dashboard → API → API Keys | Print-on-demand orders |
+| `MAILCHANNELS_API_KEY` | Mailchannels email API key | Mailchannels Dashboard → Verified Account | Email notifications |
+| `API_BASE_URL` | Base URL for frontend API calls | Your deployed worker domain | Frontend configuration |
+
+**To add secrets:**
+1. Go to GitHub repository → Settings → Secrets and variables → Actions
+2. Click "New repository secret"
+3. Add each secret from the table above
 
 ### Deploy Infrastructure
 
@@ -280,14 +300,13 @@ terraform apply
 ### Deployment Checklist
 
 - [ ] Cloudflare account created, API token generated
-- [ ] Terraform Cloud account created, API token in GitHub Secrets
-- [ ] All third-party API keys added to GitHub Secrets
-- [ ] D1 migrations tested locally
+- [ ] Terraform Cloud account created, API token generated
+- [ ] All GitHub Secrets added (see table above)
+- [ ] D1 migrations tested locally (`docker compose up`)
 - [ ] Stripe webhook configured (Cloudflare domain)
 - [ ] Printful API tested with real credentials
 - [ ] R2 CORS rules verified
 - [ ] GitHub repo connected to Terraform Cloud
-- [ ] GitHub Actions secrets all set
 - [ ] Push to main, verify all workflows succeed
 - [ ] Test live deployment (signup, shop, checkout)
 
