@@ -71,15 +71,11 @@ jobs:
           for i in {1..30}; do
             worker_response=$(curl -s --max-time 2 -w "\n%{http_code}" http://127.0.0.1:8787/health 2>&1 || echo "error")
             worker_status=$(echo "$worker_response" | tail -1)
-            worker_body=$(echo "$worker_response" | head -n -1)
             worker_ready=$([ "$worker_status" = "200" ] && echo "✓" || echo "✗")
             
             pages_response=$(curl -s --max-time 2 -w "\n%{http_code}" http://127.0.0.1:5173 2>&1 || echo "error")
             pages_status=$(echo "$pages_response" | tail -1)
             pages_ready=$([ "$pages_status" = "200" ] && echo "✓" || echo "✗")
-            
-            echo "[$i/30] Worker: $worker_ready (HTTP $worker_status) | Pages: $pages_ready (HTTP $pages_status)"
-            [ "$i" -eq 1 ] || [ "$i" -eq 15 ] || [ "$i" -eq 30 ] && echo "  Worker response: $worker_body"
 
             if [ "$worker_ready" = "✓" ] && [ "$pages_ready" = "✓" ]; then
               echo "✅ Services are ready!"
@@ -88,21 +84,10 @@ jobs:
             sleep 2
           done
           echo "❌ Services did not start in time after 1 minute"
-          echo "Debug info:"
-          docker ps
           echo ""
           echo "Container status:"
           docker inspect cloudshop-wrangler-1 --format='{{.State.Status}}'
           docker inspect cloudshop-pages-1 --format='{{.State.Status}}'
-          echo ""
-          echo "Testing health endpoint directly:"
-          curl -v http://127.0.0.1:8787/health 2>&1 | head -30
-          echo ""
-          echo "Wrangler logs (last 30 lines):"
-          docker logs cloudshop-wrangler-1 2>&1 | tail -30
-          echo ""
-          echo "Checking if wrangler process is still running:"
-          docker exec cloudshop-wrangler-1 ps aux | grep wrangler || echo "No wrangler process found"
           exit 1
 
       - name: Run Playwright tests
