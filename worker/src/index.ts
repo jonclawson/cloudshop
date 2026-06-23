@@ -32,9 +32,20 @@ let seededAdminVerified = false;
 
 app.use('*', async (c, next) => {
   const environment = c.env.ENVIRONMENT || 'production';
+  const path = c.req.path;
+  
+  console.log(`[Middleware] Handling request: ${path}`);
+
+  // Skip seeded admin logic for health checks
+  if (path === '/health') {
+    console.log(`[Middleware] Skipping admin verification for health check`);
+    await next();
+    return;
+  }
 
   if (!seededAdminVerified && environment !== 'production') {
     try {
+      console.log(`[Middleware] Verifying seeded admin...`);
       const db = getDb(c.env.DB);
       const adminRows = await db
         .select({ id: schema.users.id })
@@ -43,6 +54,7 @@ app.use('*', async (c, next) => {
         .limit(1);
 
       if (adminRows.length === 0) {
+        console.log(`[Middleware] Creating seeded admin user...`);
         const userId = crypto.randomUUID();
         const passwordHash = await hashPassword(SEEDED_ADMIN_PASSWORD);
 
@@ -52,11 +64,13 @@ app.use('*', async (c, next) => {
           password_hash: passwordHash,
           admin: true,
         });
+        console.log(`[Middleware] Seeded admin created successfully`);
+      } else {
+        console.log(`[Middleware] Seeded admin already exists`);
       }
 
       seededAdminVerified = true;
     } catch (error) {
-      // Don't block requests; migrations should already be applied before the worker starts.
       console.error('Seeded admin verification failed (continuing):', error);
     }
   }
