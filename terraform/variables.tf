@@ -1,14 +1,20 @@
-# variable "tf_cloud_organization" {
-#   description = "Terraform Cloud organization name"
-#   type        = string
-#   sensitive   = true
-# }
+variable "site_name" {
+  description = "Name of the Cloudshop instance"
+  type        = string
+  default     = "cloudshop"
+}
 
-# variable "tf_cloud_workspace" {
-#   description = "Terraform Cloud workspace name"
-#   type        = string
-#   default     = "cloudshop"
-# }
+variable "tf_cloud_organization" {
+  description = "Terraform Cloud organization name"
+  type        = string
+  sensitive   = true
+}
+
+variable "tf_cloud_workspace" {
+  description = "Terraform Cloud workspace name"
+  type        = string
+  default     = "cloudshop"
+}
 variable "cloudflare_api_token" {
   description = "Cloudflare API Token"
   type        = string

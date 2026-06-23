@@ -1,11 +1,11 @@
 resource "cloudflare_r2_bucket" "uploads" {
   account_id = var.account_id
-  bucket_name = "cloudshop-uploads-${var.environment}"
+  name = "${var.site_name}-uploads-${var.environment}"
   location   = "WNAM"  # Western North America
 }
 
 output "r2_bucket_name" {
-  value = cloudflare_r2_bucket.uploads.bucket_name
+  value = cloudflare_r2_bucket.uploads.name
 }
 
 output "r2_bucket_id" {
