@@ -11,7 +11,7 @@ terraform {
     organization = var.tf_cloud_organization
 
     workspaces {
-      name = "cloudshop"
+      name = var.tf_cloud_workspace
     }
   }
 }
@@ -24,6 +24,12 @@ variable "tf_cloud_organization" {
   description = "Terraform Cloud organization name"
   type        = string
   sensitive   = true
+}
+
+variable "tf_cloud_workspace" {
+  description = "Terraform Cloud workspace name"
+  type        = string
+  default     = "cloudshop"
 }
 
 variable "cloudflare_api_token" {

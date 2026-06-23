@@ -29,6 +29,7 @@ jobs:
         run: terraform plan -out=tfplan
         env:
           TF_VAR_tf_cloud_organization: ${{ secrets.TF_CLOUD_ORGANIZATION }}
+          TF_VAR_tf_cloud_workspace: ${{ secrets.TF_CLOUD_WORKSPACE }}
           TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}
           TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
 
@@ -37,5 +38,6 @@ jobs:
         run: terraform apply -auto-approve tfplan
         env:
           TF_VAR_tf_cloud_organization: ${{ secrets.TF_CLOUD_ORGANIZATION }}
+          TF_VAR_tf_cloud_workspace: ${{ secrets.TF_CLOUD_WORKSPACE }}
           TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}
           TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
