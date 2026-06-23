@@ -15,7 +15,7 @@ services:
     environment:
       NODE_ENV: development
     command: >
-      sh -c "npm install && rm -rf /root/.config/.wrangler/state/v3/d1 && rm -rf /.wrangler/state/v3/d1 && npx wrangler d1 migrations apply cloudshop --local --env development --config wrangler.test.toml && npm run dev -- --config wrangler.test.toml --env development"
+      sh -c "npm install && rm -rf /root/.config/.wrangler/state/v3/d1 && rm -rf /.wrangler/state/v3/d1 && npx wrangler d1 migrations apply cloudshop --local --env development --config wrangler.test.toml && npx wrangler dev --config wrangler.test.toml --env development"
     networks:
       - cloudshop
 
