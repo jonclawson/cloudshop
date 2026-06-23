@@ -89,10 +89,15 @@ jobs:
           echo "Debug info:"
           docker ps
           echo ""
+          echo "Container status:"
+          docker inspect cloudshop-wrangler-1 --format='{{.State.Status}}'
+          docker inspect cloudshop-pages-1 --format='{{.State.Status}}'
+          echo ""
           echo "Testing health endpoint directly:"
           curl -v http://127.0.0.1:8787/health 2>&1 | head -30
           echo ""
-          docker logs cloudshop-wrangler-1 2>&1 | tail -20
+          echo "Wrangler logs (last 30 lines):"
+          docker logs cloudshop-wrangler-1 2>&1 | tail -30
           exit 1
 
       - name: Run Playwright tests
