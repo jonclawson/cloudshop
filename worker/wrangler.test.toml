@@ -1,0 +1,54 @@
+name = "cloudshop-worker"
+main = "src/index.ts"
+compatibility_date = "2024-11-07"
+
+# -----------------------------------------------------------
+# Default / Production Configuration
+# -----------------------------------------------------------
+[[d1_databases]]
+binding = "DB"
+database_name = "cloudshop"
+database_id = "local-db"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "cloudshop-uploads"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "cloudshop-kv"
+
+# -----------------------------------------------------------
+# Development Environment (TEST - all local)
+# -----------------------------------------------------------
+[[env.development.d1_databases]]
+binding = "DB"
+database_name = "cloudshop"
+database_id = "local-db"
+# Defaults to a local simulation
+
+[[env.development.r2_buckets]]
+binding = "R2"
+bucket_name = "cloudshop-uploads"
+remote = false # <--- LOCAL R2 simulation for testing (no Cloudflare credentials needed)
+
+[[env.development.kv_namespaces]]
+binding = "KV"
+id = "cloudshop-kv"
+# Defaults to a local simulation
+
+# -----------------------------------------------------------
+# Production Environment
+# -----------------------------------------------------------
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "cloudshop"
+database_id = "prod-db"
+
+[[env.production.r2_buckets]]
+binding = "R2"
+bucket_name = "cloudshop-uploads-prod"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "cloudshop-kv-prod"

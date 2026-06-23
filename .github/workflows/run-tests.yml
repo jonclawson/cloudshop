@@ -49,6 +49,7 @@ jobs:
           STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
           PRINTFUL_API_KEY=${{ secrets.PRINTFUL_API_KEY }}
           MAILCHANNELS_API_KEY=${{ secrets.MAILCHANNELS_API_KEY }}
+          CLOUDFLARE_API_TOKEN=
           EOF
 
           # Create Pages environment file
@@ -58,7 +59,7 @@ jobs:
           EOF
 
       - name: Start Docker containers
-        run: docker compose up -d
+        run: docker compose -f docker-compose.test.yml up -d
 
       - name: Wait for services to be ready
         run: |
