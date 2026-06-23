@@ -272,7 +272,7 @@ Add these secrets to your GitHub repository settings. They are used by GitHub Ac
 |--------|---------|--------|--------------|
 | `TF_API_TOKEN` | Terraform Cloud authentication |  app.terraform.io | Infrastructure deployment |
 | `TF_CLOUD_ORGANIZATION` | Terraform Cloud organization name |  app.terraform.io → Settings → Organization Name | Infrastructure deployment |
-| `TF_CLOUD_WORKSPACE` | Terraform Cloud workspace name | Any name (e.g., "cloudshop") | Infrastructure deployment |
+| `TF_CLOUD_WORKSPACE` | Terraform Cloud workspace name | Any name (e.g., "cloudshop_cli") | Infrastructure deployment |
 | `CF_API_TOKEN` | Cloudflare API authentication | Cloudflare Dashboard → API Tokens | All Cloudflare operations |
 | `CF_ACCOUNT_ID` | Cloudflare account identifier | Cloudflare Dashboard → Account ID | All Cloudflare operations |
 | `JWT_SECRET` | JWT token signing secret (Worker) | Generate any strong random string | Worker authentication |
@@ -382,6 +382,39 @@ npm run test:e2e -- --debug
 ### Terraform State Issues
 - State stored remotely in Terraform Cloud (no local .tfstate)
 - To view: Log into terraform.io, check workspace
+
+### Stup CF_API_TOKEN for deployments
+Here's how to create the **CF_API_TOKEN** (Cloudflare API Token):
+You're right—my bad. The UI has changed. Here's a simpler approach:
+
+**Use a pre-made template instead:**
+
+1. **Log in to Cloudflare Dashboard** at [dash.cloudflare.com](https://dash.cloudflare.com)
+
+2. **Go to API Tokens:**
+   - Click your profile icon (bottom left)
+   - Select "API Tokens"
+
+3. **Use the "Edit Cloudflare Workers" template:**
+   - Click "Create Token"
+   - Scroll down and select **"Edit Cloudflare Workers"** (this template includes D1, R2, KV, Pages, etc.)
+   - Click "Use Template"
+
+4. **Adjust scope if needed:**
+   - Make sure "All accounts" or your specific account is selected
+   - Click "Continue to summary"
+
+5. **Create and copy:**
+   - Click "Create Token"
+   - Copy immediately
+
+6. **Add to GitHub Secrets:**
+   - Go to your repo → Settings → Secrets and variables → Actions
+   - New secret: `CF_API_TOKEN` = (paste token)
+
+The "Edit Cloudflare Workers" template should have all the permissions needed for Workers, D1, R2, KV, and Pages.
+
+If that template doesn't work either, what **do** you see when you click "Create Token"? That will help me give you the exact steps.
 
 ## Contributing
 
