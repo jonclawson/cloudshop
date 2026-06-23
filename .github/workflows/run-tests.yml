@@ -39,6 +39,24 @@ jobs:
       - name: Install Playwright
         run: npx playwright install --with-deps
 
+      - name: Create environment files
+        run: |
+          # Create Worker environment file
+          cat > ./worker/.dev.vars.development << EOF
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          ENVIRONMENT=development
+          USE_MOCKS=true
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          PRINTFUL_API_KEY=${{ secrets.PRINTFUL_API_KEY }}
+          MAILCHANNELS_API_KEY=${{ secrets.MAILCHANNELS_API_KEY }}
+          EOF
+
+          # Create Pages environment file
+          cat > ./.env.development << EOF
+          VITE_API_BASE_URL=http://localhost:8787
+          VITE_STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          EOF
+
       - name: Start Docker containers
         run: docker compose up -d
 
