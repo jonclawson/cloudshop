@@ -55,3 +55,17 @@ jobs:
           # TF_VAR_tf_cloud_workspace: ${{ secrets.TF_CLOUD_WORKSPACE }}
           TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}
           TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+      
+      - name: Export Terraform Outputs
+        working-directory: ./terraform
+        run: terraform output -json > /tmp/tf-outputs.json
+        env:
+          TF_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORGANIZATION }}
+          TF_WORKSPACE: ${{ secrets.TF_CLOUD_WORKSPACE }}
+          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Upload Outputs Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs
+          path: /tmp/tf-outputs.json
