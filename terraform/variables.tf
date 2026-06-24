@@ -62,3 +62,45 @@ variable "mailchannels_api_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "jwt_secret" {
+  description = "JWT Secret Key for Worker authentication"
+  type        = string
+  sensitive   = true
+}
+
+variable "stripe_secret_key" {
+  description = "Stripe Secret Key for payment processing"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_publishable_key" {
+  description = "Stripe Publishable Key for front-end"
+  type        = string
+  default     = ""
+}
+
+variable "github_token" {
+  description = "GitHub Token for Pages repository linking"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "worker_env_vars" {
+  description = "Public environment variables for Worker"
+  type        = map(string)
+  default = {
+    ENVIRONMENT = "production"
+    USE_MOCKS   = "false"
+  }
+}
+
+variable "worker_secrets" {
+  description = "Secret environment variables for Worker (passed via GitHub secrets)"
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
