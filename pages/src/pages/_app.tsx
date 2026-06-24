@@ -1,9 +1,8 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 
 export default function GlobalLayout() {
   const { isAuthenticated, logout, user } = useAuth();
-  const navigate = useNavigate();
 
   const showAdminMenu = isAuthenticated && user?.admin === true;
 
@@ -76,7 +75,7 @@ export default function GlobalLayout() {
                     type="button"
                     onClick={async () => {
                       await logout();
-                      navigate('/login', { replace: true });
+                      window.location.href = '/login';
                     }}
                     className="text-gray-700 hover:text-gray-900"
                   >
