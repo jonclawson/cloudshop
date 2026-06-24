@@ -11,16 +11,16 @@ import PrintfulEstimate from '../../components/PrintfulEstimate';
 import { putPrintFile } from '../../printAssetsIdb';
 import FullScreenDialog from '../../components/FullScreenDialog';
 
-const techniqueKeys = [
-    "cut-sew",
-    "digital",
-    "direct-to-fabric",
-    "dtfilm",
-    "dtg",
-    "embroidery",
-    "sublimation",
-    "uv"
-];
+// const techniqueKeys = [
+//     "cut-sew",
+//     "digital",
+//     "direct-to-fabric",
+//     "dtfilm",
+//     "dtg",
+//     "embroidery",
+//     "sublimation",
+//     "uv"
+// ];
 
 type ProductVariant = {
   id: number | string;
@@ -127,7 +127,7 @@ export default function ProductPage() {
             nextProduct.options.forEach((option) => {
               if (option.values) {
                 const firstValue = Object.entries(option.values)[0];
-                setOptions((prev) => ([
+                setOptions(() => ([
                   {id: option.id, value: firstValue[0]},
                 ]));
               }
@@ -150,14 +150,6 @@ export default function ProductPage() {
   }, [id]);
 
   const displayName = product?.title || product?.name || 'Product';
-
-  const priceLabel = useMemo(() => {
-    const price = selectedVariant?.price ?? 0;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  }, [selectedVariant]);
 
     const variantPriceLabel = useCallback((price: number = 0) => {
     // const price = selectedVariant?.price ?? 0;

@@ -27,7 +27,7 @@ type CartLineWithUploads = CartLine & {
   image?: string; // thumb data URL (from product page)
   printAssetKey?: string; // IDB key for print file
   technique?:  {key: string; display_name: string; is_default: boolean};
-  options?: Record<string, string>;
+  options?: {id: string, value: any}[];
   template?: PrintstudioTemplateConfig
 };
 
