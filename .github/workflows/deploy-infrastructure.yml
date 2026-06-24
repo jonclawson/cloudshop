@@ -33,6 +33,7 @@ jobs:
           TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
 
       - name: Terraform Plan
+        id: plan
         working-directory: ./terraform
         run: terraform plan -out=tfplan
         env:
@@ -45,6 +46,7 @@ jobs:
           TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
 
       - name: Terraform Apply
+        if: steps.plan.outputs.has_changes == 'true'
         working-directory: ./terraform
         run: terraform apply -auto-approve tfplan
         env:
