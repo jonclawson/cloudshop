@@ -22,7 +22,7 @@ type Bindings = {
   ENVIRONMENT?: string;
   USE_MOCKS?: string;
   JWT_SECRET?: string;
-  KV: KVNamespace;
+  KV?: KVNamespace;
   PRINTFUL_API_KEY?: string;
 };
 
@@ -77,7 +77,7 @@ async function rateLimitCreateOrder(c: { env: Bindings }, key: string): Promise<
   const environment = c.env.ENVIRONMENT ?? 'development';
 
   // In development/emulator we don’t want checkout spam tests to permanently hit 429s.
-  if (environment !== 'production') return;
+  if (!c.env.KV || environment !== 'production') return;
 
   const limit = 5; // requests
   const windowMs = 60 * 60 * 1000; // 1 hour
