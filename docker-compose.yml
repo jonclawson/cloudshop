@@ -14,6 +14,8 @@ services:
       - ./worker/.dev.vars.development
     environment:
       NODE_ENV: development
+    # tty: true
+    # stdin_open: true
     command: >
       sh -c "npm install && rm -rf /root/.config/.wrangler/state/v3/d1 && rm -rf /.wrangler/state/v3/d1 && npx wrangler d1 migrations apply cloudshop --local && npm run dev"
     networks:
