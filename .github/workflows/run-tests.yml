@@ -30,15 +30,15 @@ jobs:
 
       - name: Install worker dependencies
         working-directory: ./worker
-        run: npm install
+        run: npm ci
 
       - name: Install pages dependencies
         working-directory: ./pages
-        run: npm install
+        run: npm ci
 
       - name: Install Playwright
         run: |
-          npm i
+          npm ci  
           npx playwright install --with-deps
 
       - name: Create environment files
