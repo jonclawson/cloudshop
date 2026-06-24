@@ -42,13 +42,13 @@ id = "cloudshop-kv"
 # -----------------------------------------------------------
 [[env.production.d1_databases]]
 binding = "DB"
-database_name = "cloudshop"
+database_name = "cloudshop-db-production"
 database_id = "prod-db"
 
 [[env.production.r2_buckets]]
 binding = "R2"
-bucket_name = "cloudshop-uploads-prod"
+bucket_name = "cloudshop-uploads-production"
 
-[[env.production.kv_namespaces]]
-binding = "KV"
-id = "cloudshop-kv-prod"
+# [[env.production.kv_namespaces]]
+# binding = "KV"
+# id = "cloudshop-kv-production"
