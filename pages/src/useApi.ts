@@ -277,6 +277,7 @@ export type PrintstudioTemplateConfig = {
   printfile_width: number;
   printfile_height: number;
   printfile_dpi: number;
+  fill_mode: 'cover' | 'fit';
 };
 
 export const productsApi = {
