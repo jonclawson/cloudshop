@@ -48,12 +48,18 @@ jobs:
         id: plan
         working-directory: ./terraform
         run: |
-          terraform plan -out=tfplan -detailed-exitcode || PLAN_EXIT=$?
-          
-          if [ "$PLAN_EXIT" = "2" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+          set +e
+          terraform plan -out=tfplan -detailed-exitcode
+          exitcode=$?
+          set -e
+
+          if [ "$exitcode" -eq 0 ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          elif [ "$exitcode" -eq 2 ]; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "Terraform plan failed"
+            exit 1
           fi
         env:
           TF_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORGANIZATION }}
