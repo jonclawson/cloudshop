@@ -1,3 +1,8 @@
+# Fetch the Cloudflare account details to get the account name
+data "cloudflare_account" "main" {
+  name = var.account_id
+}
+
 # Create the Worker script with inline bindings
 resource "cloudflare_workers_script" "main" {
   account_id  = var.account_id
