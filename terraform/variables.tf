@@ -3,6 +3,11 @@ variable "site_name" {
   type        = string
   default     = "cloudshop"
 }
+variable "site_url" {
+  description = "URL of the Cloudshop instance"
+  type        = string
+  default     = "https://cloudshop.pages.dev"
+}
 
 # variable "tf_cloud_organization" {
 #   description = "Terraform Cloud organization name"
@@ -26,10 +31,10 @@ variable "account_id" {
   type        = string
 }
 
-variable "domain" {
+variable "worker_url" {
   description = "Domain for Cloudshop"
   type        = string
-  default     = "cloudshop.example.com"
+  default     = "https://cloudshop.workers.dev"
 }
 
 variable "environment" {

@@ -25,11 +25,9 @@ resource "cloudflare_pages_project" "main" {
   deployment_configs = {
     production = {
       env_vars = {
-        # VITE_API_BASE_URL = "https://api.${var.domain}"
-        # VITE_USE_MOCKS    = "false"
         VITE_API_BASE_URL = {
           type = "plain_text"
-          value = "https://api.${var.domain}"
+          value = "${var.worker_url}"
         }
         VITE_USE_MOCKS    = {
           type = "plain_text"
@@ -41,26 +39,13 @@ resource "cloudflare_pages_project" "main" {
         }
       }
 
-      # secret_variables = {
-      #   VITE_STRIPE_PUBLISHABLE_KEY = var.stripe_publishable_key
-      # }
     }
 
     preview = {
-      # environment_variables = {
-      #   VITE_API_BASE_URL = "http://localhost:8787"
-      #   VITE_USE_MOCKS    = "true"
-      # }
-
-      # secret_variables = {
-      #   VITE_STRIPE_PUBLISHABLE_KEY = var.stripe_publishable_key
-      # }
       env_vars = {
-        # VITE_API_BASE_URL = "https://api.${var.domain}"
-        # VITE_USE_MOCKS    = "false"
         VITE_API_BASE_URL = {
           type = "plain_text"
-          value = "https://api.${var.domain}"
+          value = "${var.worker_url}"
         }
         VITE_USE_MOCKS    = {
           type = "plain_text"
@@ -94,5 +79,5 @@ output "pages_production_url" {
 }
 
 output "pages_url" {
-  value = "https://cloudshop.${var.domain}"
+  value = "${var.site_url}"
 }

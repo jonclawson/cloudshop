@@ -85,5 +85,5 @@ output "worker_name" {
 }
 
 output "worker_url" {
-  value = "https://api.${var.domain}"
+  value = "${var.worker_url}"
 }
