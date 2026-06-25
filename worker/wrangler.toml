@@ -43,7 +43,7 @@ id = "cloudshop-kv"
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "cloudshop-db-production"
-database_id = "${env:d1_database_id}"
+database_id = "${env:D1_DATABASE_ID}"
 
 [[env.production.r2_buckets]]
 binding = "R2"
