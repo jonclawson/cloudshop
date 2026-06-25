@@ -27,7 +27,7 @@ resource "cloudflare_pages_project" "main" {
       env_vars = {
         VITE_API_BASE_URL = {
           type = "plain_text"
-          value = "${var.worker_url}"
+          value = local.worker_url
         }
         VITE_USE_MOCKS    = {
           type = "plain_text"
@@ -45,7 +45,7 @@ resource "cloudflare_pages_project" "main" {
       env_vars = {
         VITE_API_BASE_URL = {
           type = "plain_text"
-          value = "${var.worker_url}"
+          value = local.worker_url
         }
         VITE_USE_MOCKS    = {
           type = "plain_text"
@@ -59,25 +59,10 @@ resource "cloudflare_pages_project" "main" {
 
     }
   }
+  
 
   # Prevent accidental destruction
-  lifecycle {
+  # lifecycle = {
     # prevent_destroy = true
-  }
-}
-
-output "pages_project_id" {
-  value = cloudflare_pages_project.main.id
-}
-
-output "pages_project_name" {
-  value = cloudflare_pages_project.main.name
-}
-
-output "pages_production_url" {
-  value = "https://${cloudflare_pages_project.main.name}.pages.dev"
-}
-
-output "pages_url" {
-  value = "${var.pages_url}"
+  # }
 }
