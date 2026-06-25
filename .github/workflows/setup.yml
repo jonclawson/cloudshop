@@ -51,7 +51,7 @@ jobs:
           set +e
           terraform plan -out=tfplan -detailed-exitcode
           exitcode=$?
-          echo "Terraform plan exit code: $?"
+          echo "Terraform plan exit code: $exitcode?"
           set -e
 
           if [ "$exitcode" -eq 0 ]; then
