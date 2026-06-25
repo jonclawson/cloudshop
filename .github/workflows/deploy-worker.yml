@@ -58,7 +58,9 @@ jobs:
 
       - name: Deploy to Cloudflare
         working-directory: ./worker
-        run: npx wrangler deploy --env production
+        run: npx wrangler deploy --env production \
+          --kv "KV=${{ env.KV_NAMESPACE_ID }}" \
+          --d1 "DB=${{ env.D1_DATABASE_ID }}"
         env:
           WORKER_SCRIPT_ID: ${{ env.WORKER_SCRIPT_ID }}
           WORKER_NAME: ${{ env.WORKER_NAME }}
