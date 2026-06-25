@@ -51,4 +51,5 @@ bucket_name = "cloudshop-uploads-production"
 
 [[env.production.kv_namespaces]]
 binding = "KV"
-id = "cloudshop-kv-production"
+# id = "cloudshop-kv-production"
+id = "${env:KV_NAMESPACE_ID}"
