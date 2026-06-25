@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       destroy:
-        description: 'Type "destroy" to confirm infrastructure destruction'
+        description: 'Type "cloudshop" to confirm infrastructure destruction'
         required: true
         type: string
 
@@ -16,8 +16,8 @@ jobs:
     steps:
       - name: Validate confirmation
         run: |
-          if [ "${{ github.event.inputs.destroy }}" != "destroy" ]; then
-            echo "❌ Confirmation did not match. Type exactly 'destroy' to confirm."
+          if [ "${{ github.event.inputs.destroy }}" != "cloudshop" ]; then
+            echo "❌ Confirmation did not match. Type exactly 'cloudshop' to confirm."
             exit 1
           fi
           echo "✅ Destruction confirmed"
@@ -42,7 +42,7 @@ jobs:
           TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
 
       - name: Terraform Destroy
-        if: github.event.inputs.destroy == 'destroy'
+        if: github.event.inputs.destroy == 'cloudshop'
         working-directory: ./terraform
         run: terraform destroy -auto-approve
         env:

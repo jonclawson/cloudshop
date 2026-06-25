@@ -75,10 +75,10 @@ resource "cloudflare_workers_script" "main" {
   ]
 
   # Prevent accidental destruction and ignore content changes (Wrangler manages content)
-  # lifecycle {
+  lifecycle {
     # prevent_destroy = true
-    # ignore_changes  = [content]
-  # }
+    ignore_changes  = all
+  }
 }
 
 # Enable the workers.dev subdomain routing for this script
