@@ -50,13 +50,16 @@ jobs:
         run: |
           set +e
           terraform plan -out=tfplan -detailed-exitcode
+          echo "Terraform plan exit code: $?"
           exitcode=$?
           set -e
 
           if [ "$exitcode" -eq 0 ]; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No changes to apply"
           elif [ "$exitcode" -eq 2 ]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "Terraform plan has changes"
           else
             echo "Terraform plan failed"
             exit 1
