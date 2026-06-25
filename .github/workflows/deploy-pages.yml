@@ -30,14 +30,6 @@ jobs:
         working-directory: ./pages
         run: npm ci
 
-      - name: Build
-        working-directory: ./pages
-        run: npm run build
-        env:
-          VITE_API_BASE_URL: ${{ secrets.API_BASE_URL }}
-          VITE_USE_MOCKS: 'false'
-          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-
       - name: Download Terraform Outputs
         uses: actions/download-artifact@v4
         with:
@@ -50,6 +42,15 @@ jobs:
         run: |
           echo "PAGES_PROJECT_ID=$(jq -r .pages_project_id.value /tmp/tf-outputs.json)" >> $GITHUB_ENV
           echo "PAGES_PROJECT_NAME=$(jq -r .pages_project_name.value /tmp/tf-outputs.json)" >> $GITHUB_ENV
+          echo "API_BASE_URL=$(jq -r .worker_url.value /tmp/tf-outputs.json)" >> $GITHUB_ENV
+
+      - name: Build
+        working-directory: ./pages
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ env.API_BASE_URL }}
+          VITE_USE_MOCKS: 'false'
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
 
       - name: Deploy to Cloudflare Pages
         working-directory: ./pages
