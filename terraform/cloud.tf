@@ -3,17 +3,11 @@ terraform {
   required_providers {
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "~> 4.0"
+      version = "~> 5.0"
     }
   }
 
-  cloud {
-    # organization = var.tf_cloud_organization
-
-    # workspaces {
-    #   name = var.tf_cloud_workspace
-    # }
-  }
+  # cloud {}
 }
 
 provider "cloudflare" {
