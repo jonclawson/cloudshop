@@ -79,12 +79,12 @@ resource "cloudflare_workers_script" "main" {
     # prevent_destroy = true
     ignore_changes  = [
       content, 
-      annotations, 
-      migration_tag, 
-      named_handlers, 
-      placement, 
-      placement_mode, 
-      placement_status
+      # annotations, 
+      # migration_tag, 
+      # named_handlers, 
+      # placement, 
+      # placement_mode, 
+      # placement_status
       ]
   }
 }
