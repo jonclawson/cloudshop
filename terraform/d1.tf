@@ -5,8 +5,8 @@ resource "cloudflare_d1_database" "cloudshop" {
           mode = "disabled"
         } 
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = all
+    # prevent_destroy = true
+    # ignore_changes  = all
   }
 }
 
