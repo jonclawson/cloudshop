@@ -49,6 +49,6 @@ database_id = "${env:D1_DATABASE_ID}"
 binding = "R2"
 bucket_name = "cloudshop-uploads-production"
 
-# [[env.production.kv_namespaces]]
-# binding = "KV"
-# id = "cloudshop-kv-production"
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "cloudshop-kv-production"
