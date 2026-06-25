@@ -277,7 +277,7 @@ Add these secrets to your GitHub repository settings. They are used by GitHub Ac
 | `CF_ACCOUNT_ID` | Cloudflare account identifier | Cloudflare Dashboard → Account ID | All Cloudflare operations |
 | `JWT_SECRET` | JWT token signing secret (Worker) | Generate any strong random string | Worker authentication |
 | `STRIPE_SECRET_KEY` | Stripe API secret key | Stripe Dashboard → API Keys | Payment processing |
-| `STRIPE_PUBLISHABLE_KEY` | Stripe public key | Stripe Dashboard → API Keys | Frontend payment integration |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe public key | Stripe Dashboard → API Keys | Frontend payment integration |
 | `PRINTFUL_API_KEY` | Printful API authentication | Printful Dashboard → API → API Keys | Print-on-demand orders |
 | `MAILCHANNELS_API_KEY` | Mailchannels email API key | Mailchannels Dashboard → Verified Account | Email notifications |
 | `API_BASE_URL` | Base URL for frontend API calls | Your deployed worker domain | Frontend configuration |
