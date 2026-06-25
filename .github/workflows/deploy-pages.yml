@@ -8,7 +8,7 @@ on:
   #     - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
   workflow_run:
-    workflows: ["Deploy Infrastructure", "Run Tests"]
+    workflows: ["Setup"]
     types: [completed]
 
 jobs:

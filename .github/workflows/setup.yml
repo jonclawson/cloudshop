@@ -1,0 +1,183 @@
+name: Setup
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    # paths:
+    #   - 'tests/**'
+    #   - 'pages/**'
+    #   - 'worker/**'
+    #   - '.github/workflows/deploy-worker.yml'
+    #   - '.github/workflows/deploy-pages.yml'
+    #   - '.github/workflows/run-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+        env:
+          TF_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORGANIZATION }}
+          TF_WORKSPACE: ${{ secrets.TF_CLOUD_WORKSPACE }}
+          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+          # TF_VAR_tf_cloud_organization: ${{ secrets.TF_CLOUD_ORGANIZATION }}
+          # TF_VAR_tf_cloud_workspace: ${{ secrets.TF_CLOUD_WORKSPACE }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}
+          TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+          TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          TF_VAR_printful_api_key: ${{ secrets.PRINTFUL_API_KEY }}
+          TF_VAR_mailchannels_api_key: ${{ secrets.MAILCHANNELS_API_KEY }}
+          TF_VAR_github_token: ${{ secrets.GITHUB_TOKEN_PAGES }}
+
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: ./terraform
+        run: terraform plan -out=tfplan
+        env:
+          TF_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORGANIZATION }}
+          TF_WORKSPACE: ${{ secrets.TF_CLOUD_WORKSPACE }}
+          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+          # TF_VAR_tf_cloud_organization: ${{ secrets.TF_CLOUD_ORGANIZATION }}
+          # TF_VAR_tf_cloud_workspace: ${{ secrets.TF_CLOUD_WORKSPACE }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}
+          TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+          TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          TF_VAR_printful_api_key: ${{ secrets.PRINTFUL_API_KEY }}
+          TF_VAR_mailchannels_api_key: ${{ secrets.MAILCHANNELS_API_KEY }}
+          TF_VAR_github_token: ${{ secrets.GITHUB_TOKEN_PAGES }}
+
+
+      - name: Terraform Apply
+        if: steps.plan.outputs.has_changes == 'true'
+        working-directory: ./terraform
+        run: terraform apply -auto-approve tfplan
+        env:
+          TF_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORGANIZATION }}
+          TF_WORKSPACE: ${{ secrets.TF_CLOUD_WORKSPACE }}
+          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+          # TF_VAR_tf_cloud_organization: ${{ secrets.TF_CLOUD_ORGANIZATION }}
+          # TF_VAR_tf_cloud_workspace: ${{ secrets.TF_CLOUD_WORKSPACE }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}
+          TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+          TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          TF_VAR_printful_api_key: ${{ secrets.PRINTFUL_API_KEY }}
+          TF_VAR_mailchannels_api_key: ${{ secrets.MAILCHANNELS_API_KEY }}
+          TF_VAR_github_token: ${{ secrets.GITHUB_TOKEN_PAGES }}
+      
+      - name: Export Terraform Outputs
+        working-directory: ./terraform
+        run: terraform output -json > /tmp/tf-outputs.json
+        env:
+          TF_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORGANIZATION }}
+          TF_WORKSPACE: ${{ secrets.TF_CLOUD_WORKSPACE }}
+          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Upload Outputs Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs
+          path: /tmp/tf-outputs.json
+  test:
+    # needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install worker dependencies
+        working-directory: ./worker
+        run: npm ci
+
+      - name: Install pages dependencies
+        working-directory: ./pages
+        run: npm ci
+
+      - name: Install Playwright
+        run: |
+          npm ci  
+          npx playwright install --with-deps
+
+      - name: Create environment files
+        run: |
+          # Create Worker environment file
+          cat > ./worker/.dev.vars.development << EOF
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          ENVIRONMENT=development
+          USE_MOCKS=true
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          PRINTFUL_API_KEY=${{ secrets.PRINTFUL_API_KEY }}
+          MAILCHANNELS_API_KEY=${{ secrets.MAILCHANNELS_API_KEY }}
+          CLOUDFLARE_API_TOKEN=
+          EOF
+
+          # Create Pages environment file
+          cat > ./.env.development << EOF
+          VITE_API_BASE_URL=http://localhost:8787
+          VITE_STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          EOF
+
+      - name: Start Docker containers
+        run: docker compose -f docker-compose.test.yml up -d
+
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for services to be ready (max 1 minute)..."
+          sleep 5
+          echo "Starting health checks..."
+          for i in {1..30}; do
+            worker_response=$(curl -s --max-time 2 -w "\n%{http_code}" http://127.0.0.1:8787/health 2>&1 || echo "error")
+            worker_status=$(echo "$worker_response" | tail -1)
+            worker_ready=$([ "$worker_status" = "200" ] && echo "✓" || echo "✗")
+            
+            pages_response=$(curl -s --max-time 2 -w "\n%{http_code}" http://127.0.0.1:5173 2>&1 || echo "error")
+            pages_status=$(echo "$pages_response" | tail -1)
+            pages_ready=$([ "$pages_status" = "200" ] && echo "✓" || echo "✗")
+
+            if [ "$worker_ready" = "✓" ] && [ "$pages_ready" = "✓" ]; then
+              echo "✅ Services are ready!"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ Services did not start in time after 1 minute"
+          echo ""
+          echo "Container status:"
+          docker inspect cloudshop-wrangler-1 --format='{{.State.Status}}'
+          docker inspect cloudshop-pages-1 --format='{{.State.Status}}'
+          exit 1
+
+      - name: Run Playwright tests
+        run: npx playwright test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
