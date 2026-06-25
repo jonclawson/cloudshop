@@ -6,7 +6,7 @@ data "cloudflare_account" "main" {
 # Create the Worker script with inline bindings
 resource "cloudflare_workers_script" "main" {
   account_id  = var.account_id
-  script_name = "cloudshop-worker"
+  script_name = "cloudshop-worker-${var.environment}"
 
   # Compatibility and module configuration
   compatibility_date = "2024-11-07"
@@ -77,7 +77,7 @@ resource "cloudflare_workers_script" "main" {
   # Prevent accidental destruction and ignore content changes (Wrangler manages content)
   lifecycle {
     # prevent_destroy = true
-    # ignore_changes  = all
+    ignore_changes  = all
   }
 }
 

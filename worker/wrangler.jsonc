@@ -58,6 +58,7 @@
     // -----------------------------------------------------------
     // Production Environment
     // -----------------------------------------------------------
+    // TODO make names dynamic based on the environment (e.g. cloudshop-uploads-production, cloudshop-uploads-staging)
     "production": {
       "d1_databases": [
         {
