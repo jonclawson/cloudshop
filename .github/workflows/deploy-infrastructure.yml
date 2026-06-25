@@ -31,6 +31,13 @@ jobs:
           # TF_VAR_tf_cloud_workspace: ${{ secrets.TF_CLOUD_WORKSPACE }}
           TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}
           TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+          TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          TF_VAR_printful_api_key: ${{ secrets.PRINTFUL_API_KEY }}
+          TF_VAR_mailchannels_api_key: ${{ secrets.MAILCHANNELS_API_KEY }}
+          TF_VAR_github_token: ${{ secrets.GITHUB_TOKEN_PAGES }}
+
 
       - name: Terraform Plan
         id: plan
@@ -44,6 +51,13 @@ jobs:
           # TF_VAR_tf_cloud_workspace: ${{ secrets.TF_CLOUD_WORKSPACE }}
           TF_VAR_cloudflare_api_token: ${{ secrets.CF_API_TOKEN }}
           TF_VAR_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+          TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          TF_VAR_printful_api_key: ${{ secrets.PRINTFUL_API_KEY }}
+          TF_VAR_mailchannels_api_key: ${{ secrets.MAILCHANNELS_API_KEY }}
+          TF_VAR_github_token: ${{ secrets.GITHUB_TOKEN_PAGES }}
+
 
       - name: Terraform Apply
         if: steps.plan.outputs.has_changes == 'true'

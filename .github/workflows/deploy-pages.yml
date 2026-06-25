@@ -1,11 +1,11 @@
 name: Deploy Pages
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'pages/**'
-      - '.github/workflows/deploy-pages.yml'
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'pages/**'
+  #     - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
   workflow_run:
     workflows: ["Deploy Infrastructure", "Run Tests"]
