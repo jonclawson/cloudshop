@@ -5,7 +5,7 @@ resource "cloudflare_pages_project" "main" {
   name       = "cloudshop"
 
   # GitHub repository integration
-  # source {
+  # source = {
   #   type = "github"
 
   #   config {
@@ -16,14 +16,14 @@ resource "cloudflare_pages_project" "main" {
   # }
 
   # Build configuration
-  # build_config {
+  # build_config = {
   #   build_command   = "cd pages && npm run build"
   #   destination_dir = "dist"
   # }
 
   # Environment variables
-  deployment_configs {
-    production {
+  deployment_configs = {
+    production = {
       env_vars = {
         # VITE_API_BASE_URL = "https://api.${var.domain}"
         # VITE_USE_MOCKS    = "false"
@@ -46,7 +46,7 @@ resource "cloudflare_pages_project" "main" {
       # }
     }
 
-    preview {
+    preview = {
       # environment_variables = {
       #   VITE_API_BASE_URL = "http://localhost:8787"
       #   VITE_USE_MOCKS    = "true"
