@@ -48,7 +48,16 @@ jobs:
       - name: Terraform Plan
         id: plan
         working-directory: ./terraform
-        run: terraform plan -out=tfplan
+        run: |
+          terraform plan -out=tfplan
+          
+          # Check if there are any changes
+          CHANGES=$(terraform show -json tfplan | jq '.resource_changes | length')
+          if [ "$CHANGES" -gt 0 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
         env:
           TF_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORGANIZATION }}
           TF_WORKSPACE: ${{ secrets.TF_CLOUD_WORKSPACE }}
