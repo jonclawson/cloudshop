@@ -10,7 +10,7 @@ resource "cloudflare_r2_bucket_cors" "r2_cors" {
   rules = [{
     id              = "AllowPagesApp"
     allowed = {
-      origins = [var.site_url] # TODO find url of pages app
+      origins = [var.pages_url] # TODO find url of pages app
       methods = ["GET", "HEAD"]
       headers = ["*"]
     }

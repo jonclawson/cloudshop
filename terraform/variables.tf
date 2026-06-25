@@ -3,7 +3,7 @@ variable "site_name" {
   type        = string
   default     = "cloudshop"
 }
-variable "site_url" {
+variable "pages_url" {
   description = "URL of the Cloudshop instance"
   type        = string
   default     = "https://cloudshop.pages.dev"

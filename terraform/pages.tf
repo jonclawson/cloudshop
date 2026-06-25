@@ -79,5 +79,5 @@ output "pages_production_url" {
 }
 
 output "pages_url" {
-  value = "${var.site_url}"
+  value = "${var.pages_url}"
 }
