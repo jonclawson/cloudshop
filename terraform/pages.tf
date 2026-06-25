@@ -2,7 +2,7 @@
 resource "cloudflare_pages_project" "main" {
   production_branch = "main"
   account_id = var.account_id
-  name       = "cloudshop"
+  name       = "cloudshop-pages"
 
   # GitHub repository integration
   # source = {
