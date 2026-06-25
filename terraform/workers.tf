@@ -81,7 +81,7 @@ output "worker_script_id" {
 }
 
 output "worker_name" {
-  value = cloudflare_workers_script.main.name
+  value = cloudflare_workers_script.main.script_name
 }
 
 output "worker_url" {
