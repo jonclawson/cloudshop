@@ -2,7 +2,12 @@
   "name": "cloudshop-worker",
   "main": "src/index.ts",
   "compatibility_date": "2024-11-07",
-
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  },
   // -----------------------------------------------------------
   // Default / Production Configuration
   // -----------------------------------------------------------
