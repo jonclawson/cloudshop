@@ -1,0 +1,84 @@
+{
+  "name": "cloudshop-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-11-07",
+
+  // -----------------------------------------------------------
+  // Default / Production Configuration
+  // -----------------------------------------------------------
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cloudshop",
+      "database_id": "local-db"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "cloudshop-uploads"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "cloudshop-kv"
+    }
+  ],
+
+  // -----------------------------------------------------------
+  // Development Environment
+  // -----------------------------------------------------------
+  "env": {
+    "development": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "cloudshop",
+          "database_id": "local-db"
+          // Defaults to a local simulation
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "R2",
+          "bucket_name": "cloudshop-uploads",
+          "remote": true // <--- ONLY R2 will connect to the live Cloudflare bucket
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "KV",
+          "id": "cloudshop-kv"
+          // Defaults to a local simulation
+        }
+      ]
+    },
+
+    // -----------------------------------------------------------
+    // Production Environment
+    // -----------------------------------------------------------
+    "production": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "cloudshop-db-production",
+          "database_id": "${env.D1_DATABASE_ID}"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "R2",
+          "bucket_name": "cloudshop-uploads-production"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "KV",
+          // "name": "cloudshop-kv-production"
+          "id": "${env.KV_NAMESPACE_ID}"
+        }
+      ]
+    }
+  }
+}
