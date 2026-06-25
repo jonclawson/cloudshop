@@ -1,6 +1,6 @@
 # Fetch the Cloudflare account details to get the account name
 data "cloudflare_account" "main" {
-  id = var.account_id
+  account_id = var.account_id
 }
 
 # Create the Worker script with inline bindings
