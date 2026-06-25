@@ -77,7 +77,10 @@ resource "cloudflare_workers_script" "main" {
   # Prevent accidental destruction and ignore content changes (Wrangler manages content)
   lifecycle {
     # prevent_destroy = true
-    ignore_changes  = all
+    ignore_changes  = [
+      content, 
+      # annotations, migration_tag, named_handlers, placement, placement_mode, placement_status
+      ]
   }
 }
 

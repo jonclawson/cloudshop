@@ -62,7 +62,10 @@ resource "cloudflare_pages_project" "main" {
   
 
   # Prevent accidental destruction
-  # lifecycle = {
+  lifecycle  {
     # prevent_destroy = true
-  # }
+    ignore_changes  = [
+      build_config,
+    ]
+  }
 }
