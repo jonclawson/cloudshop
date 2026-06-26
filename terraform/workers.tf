@@ -39,19 +39,19 @@ resource "cloudflare_workers_script" "main" {
     # R2 Access Key ID binding
     {
       name = "R2_ACCESS_KEY_ID"
-      type = "plain_text"
+      type = "secret_text"
       text = var.r2_access_key_id
     },
     # R2 Secret Access Key binding
     {
       name = "R2_SECRET_ACCESS_KEY"
-      type = "plain_text"
+      type = "secret_text"
       text = var.r2_secret_access_key
     },
     # R2_ACCOUNT_ID = cloudflare account id
     {
       name = "R2_ACCOUNT_ID"
-      type = "plain_text"
+      type = "secret_text"
       text = var.account_id
     },
     # R2_BUCKET_NAME
