@@ -36,6 +36,30 @@ resource "cloudflare_workers_script" "main" {
       type         = "kv_namespace"
       namespace_id = cloudflare_workers_kv_namespace.rate_limiting.id
     },
+    # R2 Access Key ID binding
+    {
+      name = "R2_ACCESS_KEY_ID"
+      type = "plain_text"
+      text = var.r2_access_key_id
+    },
+    # R2 Secret Access Key binding
+    {
+      name = "R2_SECRET_ACCESS_KEY"
+      type = "plain_text"
+      text = var.r2_secret_access_key
+    },
+    # R2_ACCOUNT_ID = cloudflare account id
+    {
+      name = "R2_ACCOUNT_ID"
+      type = "plain_text"
+      text = var.account_id
+    },
+    # R2_BUCKET_NAME
+    {
+      name = "R2_BUCKET_NAME"
+      type = "plain_text"
+      text = cloudflare_r2_bucket.uploads.name
+    },
     # Secret: JWT Secret
     {
       name        = "JWT_SECRET"

@@ -275,6 +275,8 @@ Add these secrets to your GitHub repository settings. They are used by GitHub Ac
 | `TF_CLOUD_WORKSPACE` | Terraform Cloud workspace name | Any name (e.g., "cloudshop_cli") | Infrastructure deployment |
 | `CF_API_TOKEN` | Cloudflare API authentication | Cloudflare Dashboard → API Tokens | All Cloudflare operations |
 | `CF_ACCOUNT_ID` | Cloudflare account identifier | Cloudflare Dashboard → Account ID | All Cloudflare operations |
+| `R2_ACCESS_KEY_ID` | R2 bucket API access key ID | Cloudflare Dashboard → R2 → Manage R2 API Tokens | R2 file uploads |
+| `R2_SECRET_ACCESS_KEY` | R2 bucket API secret access key | Cloudflare Dashboard → R2 → Manage R2 API Tokens | R2 file uploads |
 | `JWT_SECRET` | JWT token signing secret (Worker) | Generate any strong random string | Worker authentication |
 | `STRIPE_SECRET_KEY` | Stripe API secret key | Stripe Dashboard → API Keys | Payment processing |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe public key | Stripe Dashboard → API Keys | Frontend payment integration |

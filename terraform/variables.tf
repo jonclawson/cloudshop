@@ -31,6 +31,16 @@ variable "account_id" {
   type        = string
 }
 
+variable "r2_access_key_id" {
+  description = "Cloudflare R2 Access Key ID"
+  type        = string
+  sensitive   = true
+}
+variable "r2_secret_access_key" {
+  description = "Cloudflare R2 Secret Access Key"
+  type        = string
+  sensitive   = true
+}
 variable "worker_url" {
   description = "Domain for Cloudshop"
   type        = string
