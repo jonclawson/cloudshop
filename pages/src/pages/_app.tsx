@@ -8,6 +8,16 @@ export default function GlobalLayout() {
 
   return (
     <>
+        <div className="bg-orange-100 border-b border-orange-200 text-orange-700">
+          <div className="max-w-7xl mx-auto px-4 py-2 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between gap-4">
+              SANDBOX MODE - This is a demo application. ORDERS WILL NOT BE PROCESSED. Payments will not be charged. Please use the test card number 4242 4242 4242 4242 with any future expiration date and any CVC code for testing.
+            </div>
+          </div>
+        </div>
+
+
+
       {/* Admin silver menu (above header), visible only to admins */}
       {showAdminMenu ? (
         <div className="bg-gray-100 border-b border-gray-200 text-gray-700">
