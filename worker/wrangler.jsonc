@@ -84,7 +84,11 @@
           // "name": "cloudshop-kv-production"
           "id": "${env.KV_NAMESPACE_ID}"
         }
-      ]
+      ],
+      "vars": {
+        "ENVIRONMENT": "production",
+        "USE_MOCKS": "false"
+      }
     }
   }
 }
