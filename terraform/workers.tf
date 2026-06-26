@@ -57,7 +57,7 @@ resource "cloudflare_workers_script" "main" {
     # R2_BUCKET_NAME
     {
       name = "R2_BUCKET_NAME"
-      type = "plain_text"
+      type = "secret_text"
       text = cloudflare_r2_bucket.uploads.name
     },
     # Secret: JWT Secret
@@ -104,12 +104,12 @@ resource "cloudflare_workers_script" "main" {
     ignore_changes  = [
       content, 
       handlers,
-      annotations, 
-      migration_tag, 
-      named_handlers, 
-      placement, 
-      placement_mode, 
-      placement_status
+      # annotations, 
+      # migration_tag, 
+      # named_handlers, 
+      # placement, 
+      # placement_mode, 
+      # placement_status
       ]
   }
 }
