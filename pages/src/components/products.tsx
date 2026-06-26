@@ -25,12 +25,13 @@ type ProductsProps = {
 
 export default function ProductsSection({ title, products }: ProductsProps) {
   return (
+  <>
+    {products.length === 0 ? (
+      <></>
+      // <p className="text-sm text-gray-600">No products available</p>
+    ) : (
     <section className="mb-10">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">{title}</h2>
-
-      {products.length === 0 ? (
-        <p className="text-sm text-gray-600">No products available</p>
-      ) : (
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">{title}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {products.map((product) => (
             <Link
@@ -64,7 +65,8 @@ export default function ProductsSection({ title, products }: ProductsProps) {
             </Link>
           ))}
         </div>
-      )}
     </section>
+      )}
+  </>
   );
 }
